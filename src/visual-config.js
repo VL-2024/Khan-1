@@ -56,7 +56,57 @@ window.CHUKO_VISUAL = {
     resultPopupFontSize: 23,
 
     // Скругление углов, px.
-    resultPopupRadius: 18
+    resultPopupRadius: 18,
+
+    // ------------------------------------------------------------
+    // ЭФФЕКТЫ РЕЗУЛЬТАТА — v20.36
+    // ------------------------------------------------------------
+    effects: {
+      result: {
+        durationMs: 920,
+        startScale: 0.16,
+        peakScale: 1.24,
+        settleScale: 0.97,
+        blurStartPx: 18,
+        startTranslateY: 26,
+        glowStrength: 1.0
+      },
+
+      confetti: {
+        normalCount: 24,
+        khanCount: 72,
+        minDurationMs: 1700,
+        maxDurationMs: 3000,
+        minSize: 5,
+        maxSize: 11,
+        driftPx: 90,
+        startSpreadTopPx: 35
+      },
+
+      fireworks: {
+        enabled: true,
+        count: 3,
+        particlesPerBurst: 54,
+        rocketDurationMs: 620,
+        burstDurationMs: 1450,
+        gravity: 0.055,
+        spread: 1.0,
+        rocketHeightMin: 330,
+        rocketHeightMax: 520
+      },
+
+      // Автоигра не начинает новый раунд, пока визуальный эффект
+      // текущего выигрыша не закончился.
+      autoPlay: {
+        waitForCelebration: true,
+
+        // Небольшой запас после полного завершения эффекта, мс.
+        endPaddingMs: 180,
+
+        // Минимальная пауза для нулевого результата.
+        zeroHoldMs: 900
+      }
+    }
   },
 
   // ================================================================

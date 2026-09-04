@@ -1,4 +1,4 @@
-# v20.34 architecture
+# v20.39 architecture
 
 ## Principle
 
@@ -72,20 +72,20 @@ without changing LMS logic or physics.
 Field art now uses `assets/field-clean.webp` with alpha; Pixi also applies an oval mask. The page background stays independent.
 
 
-### Scenario layer — v20.34
+### Scenario layer — v20.39
 
 `src/scenario-config.js` является единым источником visual scenario mapping.
 `lms-adapter.js` использует его для проверки scenario id и DEMO/mock цикла.
 `game.js` использует его только для `{regular, khan}` visual plan.
 Монетарный `win` остаётся LMS-authoritative.
 
-### Audio/UI layer — v20.34
+### Audio/UI layer — v20.39
 
 Audio is isolated from Matter.js and LMS logic.
 `renderState()` observes state transitions for SFX only; no physics function
 depends on audio. Ticket number is rendered from `ticket.ticketId`.
 
-### Local recent ticket history — v20.34
+### Local recent ticket history — v20.39
 
 A bounded localStorage cache stores only `{ticketId, win}` after `ROUND_COMPLETE`.
 REAL and DEMO use separate keys. This is UI convenience only and is not an

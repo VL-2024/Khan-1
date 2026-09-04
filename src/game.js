@@ -32,6 +32,7 @@
     autoCounts: document.getElementById('autoplay-counts'),
     status: document.getElementById('status'),
     toast: document.getElementById('result-toast'),
+    celebration: document.getElementById('celebration-layer'),
     knocked: document.getElementById('score-knocked'),
     scoreWin: document.getElementById('score-win'),
     khan: document.getElementById('score-khan'),
@@ -178,6 +179,11 @@
   let drag = null;
   let round = null;
   let bursts = [];
+
+  const resultFxRuntime = {
+    tickerCallbacks: new Set(),
+    timeouts: new Set()
+  };
 
   function tr(key) {
     const lang = DICT[language] || DICT.RU;
@@ -771,6 +777,43 @@
     }, delay);
   }
 
+  function celebrationHoldMs() {
+    const fx = V.tuning?.effects || {};
+    const autoFx = fx.autoPlay || {};
+
+    const zeroHold = Math.max(0, Number(autoFx.zeroHoldMs ?? CFG.autoPlayNextRoundDelayMs ?? 900));
+    if (!ticket || Number(ticket.win || 0) <= 0) return zeroHold;
+
+    if (autoFx.waitForCelebration === false) {
+      return Math.max(0, Number(CFG.autoPlayNextRoundDelayMs ?? 900));
+    }
+
+    const padding = Math.max(0, Number(autoFx.endPaddingMs ?? 180));
+    const confetti = fx.confetti || {};
+
+    // Confetti falls for up to maxDurationMs; add the same cleanup safety
+    // interval used by launchConfetti().
+    const confettiMs =
+      Math.max(600, Number(confetti.maxDurationMs ?? 3000)) + 900;
+
+    let fireworksMs = 0;
+
+    if (round?.khanOut && fx.fireworks?.enabled !== false) {
+      const fw = fx.fireworks || {};
+      const count = Math.max(1, Math.round(Number(fw.count ?? 3)));
+      const rocketMs = Math.max(250, Number(fw.rocketDurationMs ?? 620));
+      const burstMs = Math.max(500, Number(fw.burstDurationMs ?? 1450));
+
+      // launchFireworks() staggers rockets by roughly 220 ms plus up to
+      // ~120 ms random start delay. Waiting this long guarantees that
+      // the final burst particles have finished falling/fading.
+      const lastLaunchDelay = Math.max(0, count - 1) * 220 + 120;
+      fireworksMs = lastLaunchDelay + rocketMs + burstMs + 220;
+    }
+
+    return Math.max(confettiMs, fireworksMs) + padding;
+  }
+
   function scheduleNextAutoRound() {
     if (!autoPlay.active || autoPlay.stopRequested || autoPlay.remaining <= 0) {
       finishAutoPlay();
@@ -778,7 +821,10 @@
     }
 
     if (autoPlay.nextTimer) clearTimeout(autoPlay.nextTimer);
-    const delay = Math.max(0, Number(CFG.autoPlayNextRoundDelayMs ?? 900));
+
+    // v20.39: autoplay waits for the full result celebration instead of
+    // cutting confetti / KHAN fireworks in the middle.
+    const delay = celebrationHoldMs();
 
     autoPlay.nextTimer = setTimeout(() => {
       autoPlay.nextTimer = null;
@@ -865,19 +911,297 @@
     ui.status.textContent = text;
   }
 
+  function registerResultFxTicker(callback) {
+    if (!callback || !app?.ticker) return callback;
+    resultFxRuntime.tickerCallbacks.add(callback);
+    app.ticker.add(callback);
+    return callback;
+  }
+
+  function unregisterResultFxTicker(callback) {
+    if (!callback) return;
+    if (app?.ticker) app.ticker.remove(callback);
+    resultFxRuntime.tickerCallbacks.delete(callback);
+  }
+
+  function registerResultFxTimeout(callback, delay) {
+    const id = setTimeout(() => {
+      resultFxRuntime.timeouts.delete(id);
+      callback();
+    }, delay);
+    resultFxRuntime.timeouts.add(id);
+    return id;
+  }
+
+  function clearCelebration() {
+    if (ui.celebration) ui.celebration.innerHTML = '';
+
+    if (app?.ticker) {
+      for (const callback of resultFxRuntime.tickerCallbacks) {
+        app.ticker.remove(callback);
+      }
+    }
+    resultFxRuntime.tickerCallbacks.clear();
+
+    for (const id of resultFxRuntime.timeouts) clearTimeout(id);
+    resultFxRuntime.timeouts.clear();
+
+    if (fxLayer) {
+      fxLayer.children
+        .filter(child => child?.__resultFx === true)
+        .forEach(child => {
+          if (child.parent === fxLayer) fxLayer.removeChild(child);
+          if (!child.destroyed) child.destroy?.({ children:true });
+        });
+    }
+  }
+
+  function effectConfig() {
+    return V.tuning?.effects || {};
+  }
+
+  function launchConfetti({ khan = false } = {}) {
+    if (!ui.celebration) return;
+
+    const cfg = effectConfig().confetti || {};
+    const count = Math.max(0, Math.round(
+      khan ? Number(cfg.khanCount ?? 72) : Number(cfg.normalCount ?? 24)
+    ));
+
+    const minDur = Math.max(600, Number(cfg.minDurationMs ?? 1700));
+    const maxDur = Math.max(minDur, Number(cfg.maxDurationMs ?? 3000));
+    const minSize = Math.max(2, Number(cfg.minSize ?? 5));
+    const maxSize = Math.max(minSize, Number(cfg.maxSize ?? 11));
+    const drift = Math.max(0, Number(cfg.driftPx ?? 90));
+    const topSpread = Math.max(0, Number(cfg.startSpreadTopPx ?? 35));
+
+    const palette = khan
+      ? ['#ffd45d','#dbe63c','#ffffff','#ff9f3f','#5fb4ff','#f26cff']
+      : ['#dbe63c','#ffffff','#5fb4ff','#ffd45d'];
+
+    for (let i = 0; i < count; i++) {
+      const piece = document.createElement('i');
+      piece.className = 'confetti-piece';
+
+      const left = Math.random() * 100;
+      const startTop = -(12 + Math.random() * topSpread);
+      const dx = (Math.random() - .5) * drift;
+      const rot = (Math.random() > .5 ? 1 : -1) * (540 + Math.random() * 900);
+      const flip = (Math.random() > .5 ? 1 : -1) * (360 + Math.random() * 720);
+      const dur = minDur + Math.random() * (maxDur - minDur);
+      const delay = Math.random() * (khan ? 520 : 320);
+      const w = minSize + Math.random() * (maxSize - minSize);
+      const h = w * (1.35 + Math.random() * .7);
+
+      piece.style.background = palette[i % palette.length];
+      piece.style.setProperty('--left', `${left}%`);
+      piece.style.setProperty('--start-top', `${startTop}px`);
+      piece.style.setProperty('--dx', `${dx}px`);
+      piece.style.setProperty('--rot', `${rot}deg`);
+      piece.style.setProperty('--flip', `${flip}deg`);
+      piece.style.setProperty('--dur', `${dur}ms`);
+      piece.style.setProperty('--delay', `${delay}ms`);
+      piece.style.setProperty('--w', `${w}px`);
+      piece.style.setProperty('--h', `${h}px`);
+
+      ui.celebration.appendChild(piece);
+    }
+
+    registerResultFxTimeout(() => {
+      if (ui.celebration) ui.celebration.innerHTML = '';
+    }, maxDur + 900);
+  }
+
+  function createFireworkParticle(x, y, color, vx, vy, lifeMs, gravity) {
+    const g = new PIXI.Graphics();
+    g.__resultFx = true;
+    g.circle(0, 0, 3.2).fill({ color, alpha:1 });
+    g.position.set(x, y);
+    fxLayer.addChild(g);
+
+    return {
+      g,
+      x, y,
+      vx, vy,
+      age:0,
+      life:lifeMs,
+      gravity,
+      trail:[]
+    };
+  }
+
+  function launchPixiFirework({
+    x,
+    startY,
+    burstY,
+    color,
+    delay = 0
+  }) {
+    const fwCfg = effectConfig().fireworks || {};
+    const particlesPerBurst = Math.max(12, Math.round(Number(fwCfg.particlesPerBurst ?? 54)));
+    const rocketDuration = Math.max(250, Number(fwCfg.rocketDurationMs ?? 620));
+    const burstDuration = Math.max(500, Number(fwCfg.burstDurationMs ?? 1450));
+    const gravity = Number(fwCfg.gravity ?? .055);
+    const spread = Math.max(.3, Number(fwCfg.spread ?? 1));
+
+    registerResultFxTimeout(() => {
+      if (!fxLayer || !app?.ticker) return;
+
+      const rocket = new PIXI.Graphics();
+      rocket.__resultFx = true;
+      rocket.circle(0, 0, 4).fill({ color:0xffffff, alpha:1 });
+      rocket.position.set(x, startY);
+      fxLayer.addChild(rocket);
+
+      const trail = new PIXI.Graphics();
+      trail.__resultFx = true;
+      fxLayer.addChild(trail);
+
+      const started = performance.now();
+
+      const tick = (ticker) => {
+        if (rocket.destroyed || trail.destroyed) {
+          unregisterResultFxTicker(tick);
+          return;
+        }
+
+        const now = performance.now();
+        const t = Math.min(1, (now - started) / rocketDuration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const ry = startY + (burstY - startY) * eased;
+
+        rocket.position.set(x, ry);
+        trail.clear();
+        trail.moveTo(x, ry + 8);
+        trail.lineTo(x, ry + 36 + 30*(1-t));
+        trail.stroke({ color:0xffd45d, width:3, alpha:.75*(1-t) });
+
+        if (t >= 1) {
+          unregisterResultFxTicker(tick);
+          if (!rocket.destroyed) rocket.destroy();
+          if (!trail.destroyed) trail.destroy();
+
+          const flash = new PIXI.Graphics();
+          flash.__resultFx = true;
+          flash.circle(x, burstY, 8).fill({ color:0xffffff, alpha:1 });
+          fxLayer.addChild(flash);
+
+          let flashAge = 0;
+          const flashTick = (tk) => {
+            if (flash.destroyed) {
+              unregisterResultFxTicker(flashTick);
+              return;
+            }
+            flashAge += tk.deltaMS;
+            const ft = Math.min(1, flashAge/220);
+            flash.scale.set(1 + ft*5);
+            flash.alpha = 1-ft;
+            if (ft >= 1) {
+              unregisterResultFxTicker(flashTick);
+              if (!flash.destroyed) flash.destroy();
+            }
+          };
+          registerResultFxTicker(flashTick);
+
+          const particles = [];
+          for (let i=0; i<particlesPerBurst; i++) {
+            const angle = (i / particlesPerBurst) * Math.PI*2 + Math.random()*.05;
+            const speed = (5.2 + Math.random()*6.8) * spread;
+            const pvx = Math.cos(angle) * speed;
+            const pvy = Math.sin(angle) * speed;
+            const pColor = [color,0xffffff,0xffd45d,0xdbe63c][i % 4];
+            particles.push(createFireworkParticle(x, burstY, pColor, pvx, pvy, burstDuration, gravity));
+          }
+
+          const burstTick = (tk) => {
+            let alive = 0;
+            for (const p of particles) {
+              if (!p.g || p.g.destroyed) continue;
+              p.age += tk.deltaMS;
+              const bt = p.age / p.life;
+              if (bt >= 1) {
+                if (!p.g.destroyed) p.g.destroy();
+                continue;
+              }
+              alive++;
+              p.vx *= .986;
+              p.vy = p.vy * .986 + p.gravity * tk.deltaMS / 16.67;
+              p.x += p.vx * tk.deltaMS / 16.67;
+              p.y += p.vy * tk.deltaMS / 16.67;
+              if (p.g.destroyed) continue;
+              p.g.position.set(p.x, p.y);
+              p.g.alpha = Math.pow(1-bt, .65);
+              p.g.scale.set(.7 + (1-bt)*.55);
+            }
+            if (!alive) unregisterResultFxTicker(burstTick);
+          };
+          registerResultFxTicker(burstTick);
+        }
+      };
+
+      registerResultFxTicker(tick);
+    }, delay);
+  }
+
+  function launchFireworks() {
+    const cfg = effectConfig().fireworks || {};
+    if (cfg.enabled === false || !fxLayer || !app) return;
+
+    const count = Math.max(1, Math.round(Number(cfg.count ?? 3)));
+    const minH = Math.max(160, Number(cfg.rocketHeightMin ?? 330));
+    const maxH = Math.max(minH, Number(cfg.rocketHeightMax ?? 520));
+
+    const colors = [0xffd45d,0xdbe63c,0x5fb4ff,0xff7f50,0xf26cff];
+    const screenW = V.designWidth;
+    const screenH = V.designHeight;
+
+    for (let i=0; i<count; i++) {
+      const x = screenW * (0.22 + Math.random() * 0.56);
+      const startY = screenH * (0.82 + Math.random()*.08);
+      const rise = minH + Math.random()*(maxH-minH);
+      const burstY = Math.max(screenH*.18, startY - rise);
+      launchPixiFirework({
+        x,
+        startY,
+        burstY,
+        color:colors[i % colors.length],
+        delay:i*220 + Math.random()*120
+      });
+    }
+  }
+
+  function launchCelebration({ khan = false } = {}) {
+    clearCelebration();
+    launchConfetti({ khan });
+    if (khan) launchFireworks();
+  }
+
   function showResult() {
     if (!ticket) return;
+
     resultVisible = true;
     const win = Number(ticket.win || 0);
-    ui.toast.textContent = win > 0
-      ? `${round?.khanOut ? tr('khanOut') + ' · ' : ''}${tr('win')}: ${money(win)} ${currencyDisplay}`
-      : tr('noWin');
+
+    ui.toast.classList.remove('zero','khan-win','show');
+    ui.toast.textContent = money(win);
+
+    if (win <= 0) {
+      ui.toast.classList.add('zero');
+    } else if (round?.khanOut) {
+      ui.toast.classList.add('khan-win');
+      launchCelebration({ khan:true });
+    } else {
+      launchCelebration({ khan:false });
+    }
+
+    void ui.toast.offsetWidth;
     ui.toast.classList.add('show');
   }
 
   function hideResult() {
     resultVisible = false;
-    ui.toast.classList.remove('show');
+    ui.toast.classList.remove('show','zero','khan-win');
+    clearCelebration();
   }
 
   function hashString(str) {
@@ -937,9 +1261,18 @@
     toast.style.top = `${top}%`;
     toast.style.width = `${width}%`;
     toast.style.minHeight = `${height}px`;
-    toast.style.fontSize = `${fontSize}px`;
+    toast.style.fontSize = `${Math.max(fontSize, 34)}px`;
     toast.style.borderRadius = `${radius}px`;
     toast.style.transform = 'translateX(-50%)';
+
+    const fx = t.effects || {};
+    const resultFx = fx.result || {};
+    toast.style.setProperty('--result-duration', `${Math.max(200, Number(resultFx.durationMs ?? 920))}ms`);
+    toast.style.setProperty('--result-start-scale', String(Math.max(.05, Number(resultFx.startScale ?? .16))));
+    toast.style.setProperty('--result-peak-scale', String(Math.max(.5, Number(resultFx.peakScale ?? 1.24))));
+    toast.style.setProperty('--result-settle-scale', String(Math.max(.5, Number(resultFx.settleScale ?? .97))));
+    toast.style.setProperty('--result-blur', `${Math.max(0, Number(resultFx.blurStartPx ?? 18))}px`);
+    toast.style.setProperty('--result-y', `${Number(resultFx.startTranslateY ?? 26)}px`);
   }
 
   async function initPixi() {
@@ -2049,7 +2382,7 @@
       await refreshBalance();
       resetBoard('IDLE');
       window.X2ChukoV20 = {
-        version:'20.34',
+        version:'20.39',
         renderer:'PixiJS',
         physics:'Matter.js',
         getState:()=>({state,gameMode,language,currency,currencyDisplay,stake,balance,ticket,scenario:ticket?.scenario,knocked:round?.knocked,khanOut:round?.khanOut}),
@@ -2057,8 +2390,8 @@
         reloadBalance:refreshBalance
       };
     } catch(err) {
-      console.error('[CHUKO v20.34 boot]',err);
-      state='error'; showStatus('v20.34 boot error: '+(err.message||err)); renderState();
+      console.error('[CHUKO v20.39 boot]',err);
+      state='error'; showStatus('v20.39 boot error: '+(err.message||err)); renderState();
     }
   }
 
