@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>ЧҮКӨ v20.33 — PixiJS + Matter.js</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="shell" id="shell">
+  <div class="bg-layer"></div>
+  <div class="pixi-layer" id="pixi-host"></div>
+
+  <div class="ui-layer">
+    <div class="topbar">
+      <div class="brand"><span class="x2">X2</span> <span class="loto">LOTO</span></div>
+      <div class="wallet">
+        <div class="wallet-meta"><div class="small-label" data-i18n="balance">Баланс</div><div class="amount" id="balance-value">—</div></div>
+        <button class="deposit" id="deposit-btn" aria-label="deposit">+</button>
+      </div>
+    </div>
+
+    <div class="titleblock">
+      <div class="game-title" data-i18n="title">ЧҮКӨ</div>
+    </div>
+
+    <div class="bottom-tools">
+      <div class="mode-switch hidden" id="mode-switch">
+        <button data-mode="real">REAL</button><button data-mode="demo">DEMO</button>
+      </div>
+
+      <div class="info-wrap">
+        <button class="info-btn" id="info-btn" type="button" data-i18n="info">Инфо</button>
+
+        <div class="info-menu" id="info-menu" aria-hidden="true">
+          <button id="info-payout" type="button" data-i18n="payoutTable">Таблица выплат</button>
+          <button id="info-how" type="button" data-i18n="howToPlay">Как играть</button>
+          <button id="info-tickets" type="button" data-i18n="myTickets">Мои билеты</button>
+        </div>
+      </div>
+
+      <button class="audio-toggle" id="sound-btn" type="button" aria-label="Звук" title="Звук">🔊</button>
+      <button class="audio-toggle" id="music-btn" type="button" aria-label="Музыка" title="Музыка">♫×</button>
+
+      <div class="ticket-number" id="ticket-number" title="">№ —</div>
+    </div>
+
+    <div class="help-modal" id="help-modal" aria-hidden="true">
+      <div class="help-dialog">
+        <button class="help-close" id="help-close" aria-label="close">×</button>
+        <div class="help-title" data-i18n="helpTitle"></div>
+        <div class="help-step"><span class="help-num">1</span><span data-i18n="helpPull"></span></div>
+        <div class="help-step"><span class="help-num">2</span><span data-i18n="helpScenario"></span></div>
+        <div class="help-step"><span class="help-num">3</span><span data-i18n="helpMultiplier"></span></div>
+        <div class="help-step"><span class="help-num">4</span><span data-i18n="helpKhan"></span></div>
+        <button class="help-ok" id="help-ok" data-i18n="helpOk"></button>
+      </div>
+    </div>
+
+    <div class="payout-modal" id="payout-modal" aria-hidden="true">
+      <div class="payout-dialog">
+        <button class="payout-close" id="payout-close" aria-label="close">×</button>
+        <div class="payout-modal-title" data-i18n="payoutTable">Таблица выплат</div>
+        <div class="payout-grid payout-grid-modal">
+          <div class="payout-item"><span>1 чүкө</span><strong>×1</strong></div>
+          <div class="payout-item"><span>2 чүкө</span><strong>×1.5</strong></div>
+          <div class="payout-item"><span>3 чүкө</span><strong>×2</strong></div>
+          <div class="payout-item"><span>4 чүкө</span><strong>×5</strong></div>
+          <div class="payout-item"><span>5 чүкө</span><strong>×10</strong></div>
+          <div class="payout-item payout-khan"><span>ХАН</span><strong>×5</strong></div>
+        </div>
+        <button class="payout-ok" id="payout-ok" data-i18n="helpOk">Понятно</button>
+      </div>
+    </div>
+
+    <div class="tickets-modal" id="tickets-modal" aria-hidden="true">
+      <div class="tickets-dialog">
+        <button class="tickets-close" id="tickets-close" aria-label="close">×</button>
+        <div class="tickets-title" data-i18n="recentTickets">Последние билеты</div>
+        <div class="tickets-list" id="tickets-list"></div>
+        <button class="tickets-ok" id="tickets-ok" data-i18n="helpOk">Понятно</button>
+      </div>
+    </div>
+
+    <div class="result-toast" id="result-toast"></div>
+
+    <div class="score">
+      <div class="score-cell"><div class="score-label" data-i18n="knocked">ВЫБИТО</div><div class="score-value" id="score-knocked">0</div></div>
+      <div class="score-cell"><div class="score-label" data-i18n="khan">ХАН</div><div class="score-value gold" id="score-khan">—</div></div>
+      <div class="score-cell"><div class="score-label" data-i18n="scoreWin">ВЫИГРЫШ</div><div class="score-value accent" id="score-win">0</div></div>
+    </div>
+
+    <div class="action-row">
+      <button class="action" id="action-btn" disabled>Загрузка...</button>
+      <button class="autoplay-btn" id="autoplay-btn" type="button">Автоигра</button>
+
+      <div class="autoplay-menu" id="autoplay-menu" aria-hidden="true">
+        <div class="autoplay-menu-title" id="autoplay-menu-title">Количество игр</div>
+        <div class="autoplay-counts" id="autoplay-counts"></div>
+      </div>
+    </div>
+
+    <div class="denom-strip" id="denom-strip" aria-label="denominations">
+      <button class="denom-arrow denom-prev" id="denom-prev" type="button" aria-label="previous denomination">‹</button>
+      <div class="denom-viewport" id="denom-viewport">
+        <div class="denom-track" id="denom-track"></div>
+      </div>
+      <button class="denom-arrow denom-next" id="denom-next" type="button" aria-label="next denomination">›</button>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="debug">v20.33 · PixiJS 8.20.1 · Matter.js 0.20.0</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.20.1/dist/pixi.min.js"
+  onerror="this.onerror=null;this.src='https://unpkg.com/pixi.js@8.20.1/dist/pixi.min.js'"></script>
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"
+  onerror="this.onerror=null;this.src='https://unpkg.com/matter-js@0.20.0/build/matter.min.js'"></script>
+<script src="config.js"></script>
+<script src="src/scenario-config.js"></script>
+<script src="lms-adapter.js"></script>
+<script src="src/visual-config.js"></script>
+<script src="src/i18n.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>
