@@ -1,0 +1,572 @@
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#02142f;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff}
+body{display:flex;justify-content:center;align-items:flex-start;overflow:auto}
+
+/* Fit the complete 941x1672 scene into BOTH viewport width and height.
+   This fixes the old mobile crop where the bottom action button disappeared. */
+.shell{
+  position:relative;
+  width:min(100vw,560px,calc(100dvh * 941 / 1672));
+  aspect-ratio:941/1672;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 38%,rgba(24,76,148,.26),transparent 35%),
+    linear-gradient(180deg,#082858 0%,#062453 38%,#031b43 72%,#02152f 100%);
+  touch-action:none;
+  user-select:none;
+}
+@supports not (height:100dvh){.shell{width:min(100vw,560px,calc(100vh * 941 / 1672))}}
+
+.bg-layer{
+  position:absolute;inset:0;z-index:0;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.018),transparent 17%),
+    radial-gradient(ellipse at 50% 43%,rgba(59,120,194,.13),transparent 45%);
+}
+.pixi-layer{position:absolute;inset:0;z-index:1}
+.pixi-layer canvas{display:block;width:100%;height:100%}
+.ui-layer{position:absolute;inset:0;z-index:2;pointer-events:none}
+.ui-layer button,.ui-layer select,.ui-layer .clickable{pointer-events:auto}
+
+/* Header */
+.topbar{
+  position:absolute;left:2.2%;right:2.2%;top:1.25%;height:6.05%;
+  display:flex;justify-content:space-between;gap:2%;align-items:center
+}
+.brand{font-weight:950;font-style:italic;font-size:clamp(19px,5.25vw,31px);letter-spacing:-1px;white-space:nowrap}
+.brand .x2{color:#c9e520}.brand .loto{color:#fff}
+.wallet,.stake-box{
+  height:100%;border:1px solid rgba(111,167,224,.42);background:rgba(3,23,54,.76);
+  border-radius:18px;display:flex;align-items:center;padding:0 10px;gap:8px;
+  box-shadow:inset 0 0 22px rgba(15,73,140,.18)
+}
+.wallet{width:42%;margin-left:auto}
+.wallet-meta,.stake-meta{min-width:0;flex:1}.small-label{font-size:clamp(9px,2.2vw,12px);opacity:.86;line-height:1.08}
+.amount{font-weight:850;font-size:clamp(12px,3.25vw,19px);white-space:nowrap}
+.deposit{width:36px;height:36px;border-radius:50%;border:0;background:#b9db00;color:#fff;font-size:29px;line-height:1;display:grid;place-items:center;cursor:pointer}
+
+/* Title kept close to v19 proportions. */
+.titleblock{position:absolute;left:12%;right:12%;top:8.35%;text-align:center}
+.game-title{font-family:Georgia,'Times New Roman',serif;font-weight:900;font-size:clamp(40px,11.8vw,67px);line-height:.95;letter-spacing:3px;text-shadow:0 3px 0 #5e5342,0 9px 18px rgba(0,0,0,.28)}
+
+.bottom-tools{
+  position:absolute;
+  left:3.7%;
+  right:3.7%;
+  top:94.2%;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  z-index:12;
+  pointer-events:auto
+}
+.mode-switch{
+  position:relative;
+  display:flex;
+  border:1px solid rgba(117,163,211,.34);
+  border-radius:10px;
+  overflow:hidden;
+  background:rgba(3,23,54,.90);
+  box-shadow:0 4px 10px rgba(0,0,0,.14)
+}
+.mode-switch.hidden{display:none}
+.mode-switch button{
+  border:0;
+  min-width:46px;
+  padding:4px 7px;
+  background:transparent;
+  color:#8196b2;
+  font-weight:900;
+  font-size:9px;
+  line-height:1.05
+}
+.mode-switch button.active{background:#24499e;color:#dbe63c}
+
+.info-wrap{position:relative}
+.info-btn{
+  min-width:54px;
+  height:25px;
+  padding:0 10px;
+  border:1px solid rgba(117,163,211,.38);
+  border-radius:10px;
+  background:rgba(3,23,54,.92);
+  color:#dbe63c;
+  font-size:9px;
+  font-weight:950;
+  line-height:1;
+  cursor:pointer
+}
+
+.info-btn.active{
+  border-color:rgba(219,230,60,.62);
+  background:#24499e
+}
+
+.audio-toggle{
+  flex:0 0 30px;
+  width:30px;
+  height:25px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(117,163,211,.38);
+  border-radius:10px;
+  background:rgba(3,23,54,.92);
+  color:#7f91aa;
+  font-size:13px;
+  font-weight:950;
+  line-height:1;
+  cursor:pointer
+}
+.audio-toggle.on{
+  border-color:rgba(219,230,60,.48);
+  color:#dbe63c;
+  background:#173d82
+}
+.audio-toggle:active{transform:translateY(1px)}
+
+.ticket-number{
+  margin-left:auto;
+  min-width:0;
+  max-width:35%;
+  padding:0 3px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  text-align:right;
+  color:#aebed3;
+  font-size:clamp(8px,1.7vw,10px);
+  font-weight:800;
+  line-height:25px
+}
+
+.info-menu{
+  position:absolute;
+  left:0;
+  bottom:calc(100% + 8px);
+  width:164px;
+  padding:7px;
+  display:none;
+  border:1px solid rgba(117,163,211,.44);
+  border-radius:14px;
+  background:rgba(3,23,54,.98);
+  box-shadow:0 16px 32px rgba(0,0,0,.38);
+  z-index:30
+}
+.info-menu.open{display:grid;gap:6px}
+.info-menu button{
+  width:100%;
+  min-height:36px;
+  padding:7px 9px;
+  border:1px solid rgba(117,163,211,.26);
+  border-radius:10px;
+  background:#183f84;
+  color:#fff;
+  font-size:10px;
+  font-weight:850;
+  line-height:1.15;
+  text-align:left;
+  cursor:pointer
+}
+.info-menu button:hover,
+.info-menu button:focus-visible{
+  border-color:rgba(219,230,60,.55);
+  color:#dbe63c
+}
+
+.payout-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 7px}
+.payout-item{
+  min-height:25px;display:flex;align-items:center;justify-content:space-between;gap:5px;
+  padding:3px 5px;border:1px solid rgba(255,255,255,.075);
+  border-radius:8px;background:rgba(10,38,82,.42);white-space:nowrap
+}
+.payout-item strong{color:#fff;font-size:1.08em}
+.payout-khan{border-color:rgba(255,212,93,.23)}
+.payout-khan strong{color:#ffd45d}
+
+
+/* Payout table is no longer permanently visible on the game field. */
+.payout-modal{
+  position:absolute;
+  inset:0;
+  z-index:21;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:8%;
+  background:rgba(0,10,28,.64);
+  backdrop-filter:blur(3px);
+  pointer-events:auto
+}
+.payout-modal.open{display:flex}
+.payout-dialog{
+  position:relative;
+  width:min(82%,430px);
+  padding:24px 20px 18px;
+  border-radius:24px;
+  border:1px solid rgba(126,178,230,.42);
+  background:linear-gradient(180deg,rgba(8,39,86,.99),rgba(3,21,52,.99));
+  box-shadow:0 24px 60px rgba(0,0,0,.45)
+}
+.payout-modal-title{
+  margin-bottom:15px;
+  text-align:center;
+  color:#dbe63c;
+  font-size:clamp(18px,4.4vw,25px);
+  font-weight:950
+}
+.payout-grid-modal{
+  grid-template-columns:1fr 1fr;
+  gap:8px
+}
+.payout-grid-modal .payout-item{
+  min-height:38px;
+  padding:6px 9px;
+  font-size:clamp(11px,2.6vw,15px)
+}
+.payout-close{
+  position:absolute;
+  right:10px;
+  top:8px;
+  width:34px;
+  height:34px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  font-size:30px;
+  line-height:1;
+  cursor:pointer
+}
+.payout-ok{
+  display:block;
+  width:64%;
+  margin:17px auto 0;
+  padding:10px 12px;
+  border-radius:16px;
+  border:1px solid rgba(211,221,231,.35);
+  background:#23499d;
+  color:#fff;
+  font-weight:900;
+  cursor:pointer
+}
+
+
+/* Local recent-ticket cache. Full history remains in the personal account. */
+.tickets-modal{
+  position:absolute;
+  inset:0;
+  z-index:22;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:8%;
+  background:rgba(0,10,28,.64);
+  backdrop-filter:blur(3px);
+  pointer-events:auto
+}
+.tickets-modal.open{display:flex}
+.tickets-dialog{
+  position:relative;
+  width:min(84%,430px);
+  padding:24px 18px 18px;
+  border-radius:24px;
+  border:1px solid rgba(126,178,230,.42);
+  background:linear-gradient(180deg,rgba(8,39,86,.99),rgba(3,21,52,.99));
+  box-shadow:0 24px 60px rgba(0,0,0,.45)
+}
+.tickets-title{
+  margin-bottom:13px;
+  text-align:center;
+  color:#dbe63c;
+  font-size:clamp(18px,4.4vw,25px);
+  font-weight:950
+}
+.tickets-list{
+  display:grid;
+  gap:7px;
+  max-height:44vh;
+  overflow:auto
+}
+.ticket-history-row{
+  min-height:42px;
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) auto;
+  gap:12px;
+  align-items:center;
+  padding:7px 10px;
+  border:1px solid rgba(117,163,211,.24);
+  border-radius:11px;
+  background:rgba(17,54,112,.54)
+}
+.ticket-history-id{
+  min-width:0;
+  overflow:visible;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  color:#d5deeb;
+  font-size:clamp(9px,2.25vw,13px);
+  font-weight:800;
+  line-height:1.15
+}
+.ticket-history-win{
+  color:#dbe63c;
+  font-size:clamp(11px,2.65vw,15px);
+  font-weight:950;
+  white-space:nowrap
+}
+.tickets-empty{
+  padding:18px 8px;
+  text-align:center;
+  color:#9dafc5;
+  font-size:clamp(11px,2.45vw,14px)
+}
+.tickets-close{
+  position:absolute;
+  right:10px;
+  top:8px;
+  width:34px;
+  height:34px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  font-size:30px;
+  line-height:1;
+  cursor:pointer
+}
+.tickets-ok{
+  display:block;
+  width:64%;
+  margin:17px auto 0;
+  padding:10px 12px;
+  border-radius:16px;
+  border:1px solid rgba(211,221,231,.35);
+  background:#23499d;
+  color:#fff;
+  font-weight:900;
+  cursor:pointer
+}
+
+/* In-game help. The old pull hint is intentionally removed from the main screen. */
+.help-modal{
+  position:absolute;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
+  padding:8%;background:rgba(0,10,28,.64);backdrop-filter:blur(3px);pointer-events:auto
+}
+.help-modal.open{display:flex}
+.help-dialog{
+  position:relative;width:min(82%,430px);padding:24px 20px 18px;border-radius:24px;
+  border:1px solid rgba(126,178,230,.42);
+  background:linear-gradient(180deg,rgba(8,39,86,.99),rgba(3,21,52,.99));
+  box-shadow:0 24px 60px rgba(0,0,0,.45)
+}
+.help-title{text-align:center;color:#dbe63c;font-size:clamp(18px,4.4vw,25px);font-weight:950;margin-bottom:16px}
+.help-step{display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:start;margin:10px 0;font-size:clamp(11px,2.65vw,15px);line-height:1.32}
+.help-num{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:#21499e;color:#dbe63c;font-weight:950}
+.help-close{position:absolute;right:10px;top:8px;width:34px;height:34px;border:0;background:transparent;color:#fff;font-size:30px;line-height:1;cursor:pointer}
+.help-ok{display:block;width:64%;margin:17px auto 0;padding:10px 12px;border-radius:16px;border:1px solid rgba(211,221,231,.35);background:#23499d;color:#fff;font-weight:900;cursor:pointer}
+
+.result-toast{position:absolute;left:20%;right:20%;top:65.0%;min-height:58px;border:1px solid rgba(255,220,110,.35);border-radius:18px;background:rgba(4,24,57,.96);display:none;align-items:center;justify-content:center;text-align:center;font-weight:900;font-size:clamp(16px,4vw,23px);box-shadow:0 12px 30px rgba(0,0,0,.28)}
+.result-toast.show{display:flex}
+
+/* Exact-ish v19 lower composition: score at y≈1288, button center y≈1436. */
+.score{position:absolute;left:6.0%;right:6.0%;top:73.82%;height:6.62%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.score-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(132,178,224,.30);background:linear-gradient(180deg,rgba(8,31,73,.96),rgba(4,20,48,.98));border-radius:18px}
+.score-label{font-size:clamp(8px,1.9vw,11px);color:#b8c6db}.score-value{font-size:clamp(18px,4.5vw,26px);font-weight:950;margin-top:2px;line-height:1}.score-value.accent{color:#dbe63c;font-size:clamp(14px,3.8vw,23px);white-space:nowrap}.score-value.gold{color:#ffd45d}
+
+.action-row{
+  position:absolute;
+  left:15.2%;
+  right:15.2%;
+  top:83.08%;
+  height:5.62%;
+  display:flex;
+  align-items:stretch;
+  gap:8px;
+  z-index:10;
+  pointer-events:auto
+}
+.action{
+  position:relative;
+  flex:1 1 auto;
+  min-width:0;
+  height:100%;
+  border-radius:26px;
+  border:1px solid rgba(211,221,231,.40);
+  background:linear-gradient(180deg,#2f4cbf 0%,#1b3590 46%,#0c1f5e 100%);
+  color:#fff;
+  font-size:clamp(16px,3.45vw,21px);
+  line-height:1;
+  font-weight:950;
+  white-space:nowrap;
+  box-shadow:inset 0 0 0 3px rgba(255,255,255,.035),0 10px 22px rgba(0,0,0,.28);
+  cursor:pointer
+}
+.action:disabled{opacity:.57;cursor:default}
+.autoplay-btn{
+  position:relative;
+  flex:0 0 34%;
+  min-width:86px;
+  height:100%;
+  padding:0 8px;
+  border-radius:24px;
+  border:1px solid rgba(219,230,60,.42);
+  background:linear-gradient(180deg,rgba(35,75,154,.98),rgba(17,46,112,.98));
+  color:#dbe63c;
+  font-size:clamp(11px,2.45vw,15px);
+  line-height:1.05;
+  font-weight:950;
+  white-space:nowrap;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.025),0 8px 18px rgba(0,0,0,.22);
+  cursor:pointer
+}
+.autoplay-btn.active{
+  border-color:rgba(255,211,89,.72);
+  background:linear-gradient(180deg,#6b5311,#3d2e08);
+  color:#ffd45d
+}
+.autoplay-btn:disabled{opacity:.55;cursor:default}
+
+.autoplay-menu{
+  position:absolute;
+  right:0;
+  bottom:calc(100% + 8px);
+  width:190px;
+  padding:11px;
+  border:1px solid rgba(117,163,211,.46);
+  border-radius:16px;
+  background:rgba(3,23,54,.98);
+  box-shadow:0 16px 32px rgba(0,0,0,.38);
+  display:none;
+  z-index:30
+}
+.autoplay-menu.open{display:block}
+.autoplay-menu-title{
+  margin-bottom:8px;
+  color:#b8c6db;
+  text-align:center;
+  font-size:10px;
+  font-weight:850
+}
+.autoplay-counts{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:7px
+}
+.autoplay-count{
+  height:34px;
+  border:1px solid rgba(117,163,211,.40);
+  border-radius:11px;
+  background:#183f84;
+  color:#fff;
+  font-size:12px;
+  font-weight:950;
+  cursor:pointer
+}
+.autoplay-count:hover,
+.autoplay-count:focus-visible{
+  border-color:rgba(219,230,60,.65);
+  color:#dbe63c
+}
+
+/* Denomination rail — v20.27.
+   Values are intentionally displayed without currency. */
+.denom-strip{
+  position:absolute;
+  left:16%;
+  right:16%;
+  top:89.35%;
+  height:3.35%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  z-index:9;
+  pointer-events:auto
+}
+.denom-viewport{
+  flex:1;
+  min-width:0;
+  overflow:hidden
+}
+.denom-track{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:max-content;
+  min-width:100%;
+  justify-content:center;
+  transition:transform .18s ease
+}
+.denom-option{
+  flex:0 0 auto;
+  min-width:54px;
+  height:30px;
+  padding:0 12px;
+  border:1px solid rgba(117,163,211,.44);
+  border-radius:11px;
+  background:rgba(3,23,54,.92);
+  color:#aebed3;
+  font-size:11px;
+  line-height:1;
+  font-weight:950;
+  box-shadow:0 4px 10px rgba(0,0,0,.15);
+  cursor:pointer
+}
+.denom-option.active{
+  border-color:rgba(219,230,60,.65);
+  background:#24499e;
+  color:#dbe63c;
+  box-shadow:0 0 0 1px rgba(219,230,60,.12),0 4px 10px rgba(0,0,0,.16)
+}
+.denom-option:disabled{
+  opacity:.55;
+  cursor:default
+}
+.denom-arrow{
+  flex:0 0 25px;
+  width:25px;
+  height:30px;
+  padding:0;
+  border:0;
+  border-radius:10px;
+  background:rgba(3,23,54,.92);
+  color:#dbe63c;
+  font-size:22px;
+  line-height:1;
+  font-weight:900;
+  visibility:hidden;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s ease;
+  cursor:pointer
+}
+.denom-arrow.visible{
+  visibility:visible;
+  opacity:1;
+  pointer-events:auto
+}
+.denom-arrow:disabled{
+  visibility:hidden;
+  opacity:0;
+  pointer-events:none
+}
+
+.status{position:absolute;left:10%;right:10%;top:92.55%;text-align:center;min-height:20px;color:#dbe63c;font-size:11px}
+.debug{display:none}
+
+@media(max-width:380px){
+  .wallet,.stake-box{padding:0 7px}
+  .wallet{width:44%}
+  .deposit{width:31px;height:31px}
+  .action-row{left:10%;right:10%;gap:6px}
+  .autoplay-btn{flex-basis:35%;min-width:80px;font-size:10px}
+  .bottom-tools{left:2.5%;right:2.5%;gap:4px}
+  .mode-switch button{min-width:38px;padding:4px 5px}
+  .info-btn{min-width:46px;padding:0 7px}
+  .audio-toggle{flex-basis:27px;width:27px}
+  .ticket-number{max-width:31%;font-size:8px}
+  .autoplay-menu{width:176px}
+  .denom-strip{left:12%;right:12%}
+  .denom-option{min-width:52px;height:29px;padding:0 10px;font-size:10px}
+  .denom-arrow{height:29px}
+}
