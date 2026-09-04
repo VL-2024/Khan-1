@@ -54,11 +54,18 @@ body{display:flex;justify-content:center;align-items:flex-start;overflow:auto}
   left:3.7%;
   right:3.7%;
   top:94.2%;
-  display:flex;
+  display:grid;
+  grid-template-columns:minmax(0,60%) minmax(0,40%);
   align-items:center;
-  gap:7px;
+  gap:0;
   z-index:12;
   pointer-events:auto
+}
+.bottom-controls{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:7px
 }
 .mode-switch{
   position:relative;
@@ -138,6 +145,30 @@ body{display:flex;justify-content:center;align-items:flex-start;overflow:auto}
   font-size:clamp(8px,1.7vw,10px);
   font-weight:800;
   line-height:25px
+}
+
+/* v20.34 — proportions of the bottom line. */
+.bottom-controls .info-btn{
+  min-width:60px;
+  height:28px;
+  padding:0 11px;
+  border-radius:11px;
+  font-size:10px
+}
+.bottom-controls .audio-toggle{
+  flex:0 0 34px;
+  width:34px;
+  height:28px;
+  border-radius:11px;
+  font-size:14px
+}
+.bottom-tools > .ticket-number{
+  margin-left:0;
+  max-width:none;
+  width:100%;
+  padding:0 0 0 8px;
+  line-height:28px;
+  font-size:clamp(7px,1.55vw,9px)
 }
 
 .info-menu{
@@ -560,11 +591,16 @@ body{display:flex;justify-content:center;align-items:flex-start;overflow:auto}
   .deposit{width:31px;height:31px}
   .action-row{left:10%;right:10%;gap:6px}
   .autoplay-btn{flex-basis:35%;min-width:80px;font-size:10px}
-  .bottom-tools{left:2.5%;right:2.5%;gap:4px}
-  .mode-switch button{min-width:38px;padding:4px 5px}
-  .info-btn{min-width:46px;padding:0 7px}
-  .audio-toggle{flex-basis:27px;width:27px}
-  .ticket-number{max-width:31%;font-size:8px}
+  .bottom-tools{
+    left:2.5%;
+    right:2.5%;
+    grid-template-columns:minmax(0,60%) minmax(0,40%)
+  }
+  .bottom-controls{gap:4px}
+  .mode-switch button{min-width:36px;padding:4px 4px}
+  .bottom-controls .info-btn{min-width:52px;height:27px;padding:0 7px;font-size:9px}
+  .bottom-controls .audio-toggle{flex-basis:30px;width:30px;height:27px;font-size:13px}
+  .bottom-tools > .ticket-number{max-width:none;font-size:7px;line-height:27px;padding-left:5px}
   .autoplay-menu{width:176px}
   .denom-strip{left:12%;right:12%}
   .denom-option{min-width:52px;height:29px;padding:0 10px;font-size:10px}

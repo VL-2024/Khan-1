@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>ЧҮКӨ v20.34 — PixiJS + Matter.js</title>
+<style>*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#02142f;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff}
+body{display:flex;justify-content:center;align-items:flex-start;overflow:auto}
+
+/* Fit the complete 941x1672 scene into BOTH viewport width and height.
+   This fixes the old mobile crop where the bottom action button disappeared. */
+.shell{
+  position:relative;
+  width:min(100vw,560px,calc(100dvh * 941 / 1672));
+  aspect-ratio:941/1672;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 38%,rgba(24,76,148,.26),transparent 35%),
+    linear-gradient(180deg,#082858 0%,#062453 38%,#031b43 72%,#02152f 100%);
+  touch-action:none;
+  user-select:none;
+}
+@supports not (height:100dvh){.shell{width:min(100vw,560px,calc(100vh * 941 / 1672))}}
+
+.bg-layer{
+  position:absolute;inset:0;z-index:0;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.018),transparent 17%),
+    radial-gradient(ellipse at 50% 43%,rgba(59,120,194,.13),transparent 45%);
+}
+.pixi-layer{position:absolute;inset:0;z-index:1}
+.pixi-layer canvas{display:block;width:100%;height:100%}
+.ui-layer{position:absolute;inset:0;z-index:2;pointer-events:none}
+.ui-layer button,.ui-layer select,.ui-layer .clickable{pointer-events:auto}
+
+/* Header */
+.topbar{
+  position:absolute;left:2.2%;right:2.2%;top:1.25%;height:6.05%;
+  display:grid;grid-template-columns:31% 34% 31%;gap:2%;align-items:center
+}
+.brand{font-weight:950;font-style:italic;font-size:clamp(19px,5.25vw,31px);letter-spacing:-1px;white-space:nowrap}
+.brand .x2{color:#c9e520}.brand .loto{color:#fff}
+.wallet,.stake-box{
+  height:100%;border:1px solid rgba(111,167,224,.42);background:rgba(3,23,54,.76);
+  border-radius:18px;display:flex;align-items:center;padding:0 10px;gap:8px;
+  box-shadow:inset 0 0 22px rgba(15,73,140,.18)
+}
+.wallet-meta,.stake-meta{min-width:0;flex:1}.small-label{font-size:clamp(9px,2.2vw,12px);opacity:.86;line-height:1.08}
+.amount{font-weight:850;font-size:clamp(12px,3.25vw,19px);white-space:nowrap}
+.deposit{width:36px;height:36px;border-radius:50%;border:0;background:#b9db00;color:#fff;font-size:29px;line-height:1;display:grid;place-items:center;cursor:pointer}
+.stake-box{position:relative;cursor:pointer}.stake-caret{font-size:21px;opacity:.78}
+.stake-menu{position:absolute;top:104%;right:0;min-width:100%;border:1px solid rgba(111,167,224,.45);border-radius:14px;background:#041b42;overflow:hidden;display:none;box-shadow:0 14px 26px rgba(0,0,0,.3)}
+.stake-menu.open{display:block}.stake-option{width:100%;border:0;background:transparent;color:#fff;padding:10px 14px;text-align:left;font-weight:800}
+.stake-option:hover,.stake-option.active{background:#183f84;color:#dbe63c}
+
+/* Title kept close to v19 proportions. */
+.titleblock{position:absolute;left:12%;right:12%;top:8.35%;text-align:center}
+.game-title{font-family:Georgia,'Times New Roman',serif;font-weight:900;font-size:clamp(40px,11.8vw,67px);line-height:.95;letter-spacing:3px;text-shadow:0 3px 0 #5e5342,0 9px 18px rgba(0,0,0,.28)}
+
+.mode-switch{position:absolute;top:16.9%;left:50%;transform:translateX(-50%);display:flex;border:1px solid rgba(117,163,211,.36);border-radius:15px;overflow:hidden;background:rgba(3,23,54,.86);box-shadow:0 4px 10px rgba(0,0,0,.14)}
+.mode-switch.hidden{display:none}.mode-switch button{border:0;min-width:78px;padding:6px 15px;background:transparent;color:#8196b2;font-weight:900;font-size:13px}
+.mode-switch button.active{background:#24499e;color:#dbe63c}
+
+/* Compact complete payout table, fully below the field. */
+.payout-card{
+  position:absolute;left:3.5%;top:56.65%;width:30.0%;
+  padding:8px 9px 9px;border:1px solid rgba(122,171,220,.36);
+  border-radius:17px;background:rgba(3,22,53,.90);
+  font-size:clamp(8px,1.75vw,10px);box-shadow:0 8px 18px rgba(0,0,0,.13)
+}
+.payout-title{color:#dbe63c;font-weight:950;text-align:center;margin:0 0 6px;letter-spacing:.2px}
+.payout-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 7px}
+.payout-item{
+  min-height:25px;display:flex;align-items:center;justify-content:space-between;gap:5px;
+  padding:3px 5px;border:1px solid rgba(255,255,255,.075);
+  border-radius:8px;background:rgba(10,38,82,.42);white-space:nowrap
+}
+.payout-item strong{color:#fff;font-size:1.08em}
+.payout-khan{border-color:rgba(255,212,93,.23)}
+.payout-khan strong{color:#ffd45d}
+
+.side-actions{position:absolute;right:2.8%;top:56.65%;display:grid;gap:11px}
+.side-actions button{
+  width:68px;min-height:58px;padding:4px;border:1px solid rgba(122,171,220,.36);
+  border-radius:16px;background:rgba(3,22,53,.90);color:#fff;font-size:10px;line-height:1.15
+}
+
+/* In-game help. The old pull hint is intentionally removed from the main screen. */
+.help-modal{
+  position:absolute;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
+  padding:8%;background:rgba(0,10,28,.64);backdrop-filter:blur(3px);pointer-events:auto
+}
+.help-modal.open{display:flex}
+.help-dialog{
+  position:relative;width:min(82%,430px);padding:24px 20px 18px;border-radius:24px;
+  border:1px solid rgba(126,178,230,.42);
+  background:linear-gradient(180deg,rgba(8,39,86,.99),rgba(3,21,52,.99));
+  box-shadow:0 24px 60px rgba(0,0,0,.45)
+}
+.help-title{text-align:center;color:#dbe63c;font-size:clamp(18px,4.4vw,25px);font-weight:950;margin-bottom:16px}
+.help-step{display:grid;grid-template-columns:30px 1fr;gap:9px;align-items:start;margin:10px 0;font-size:clamp(11px,2.65vw,15px);line-height:1.32}
+.help-num{width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:#21499e;color:#dbe63c;font-weight:950}
+.help-close{position:absolute;right:10px;top:8px;width:34px;height:34px;border:0;background:transparent;color:#fff;font-size:30px;line-height:1;cursor:pointer}
+.help-ok{display:block;width:64%;margin:17px auto 0;padding:10px 12px;border-radius:16px;border:1px solid rgba(211,221,231,.35);background:#23499d;color:#fff;font-weight:900;cursor:pointer}
+
+.result-toast{position:absolute;left:20%;right:20%;top:65.0%;min-height:58px;border:1px solid rgba(255,220,110,.35);border-radius:18px;background:rgba(4,24,57,.96);display:none;align-items:center;justify-content:center;text-align:center;font-weight:900;font-size:clamp(16px,4vw,23px);box-shadow:0 12px 30px rgba(0,0,0,.28)}
+.result-toast.show{display:flex}
+
+/* Exact-ish v19 lower composition: score at y≈1288, button center y≈1436. */
+.score{position:absolute;left:6.0%;right:6.0%;top:73.82%;height:6.62%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.score-cell{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(132,178,224,.30);background:linear-gradient(180deg,rgba(8,31,73,.96),rgba(4,20,48,.98));border-radius:18px}
+.score-label{font-size:clamp(8px,1.9vw,11px);color:#b8c6db}.score-value{font-size:clamp(18px,4.5vw,26px);font-weight:950;margin-top:2px;line-height:1}.score-value.accent{color:#dbe63c}.score-value.gold{color:#ffd45d}
+
+.action{position:absolute;left:23.15%;right:23.15%;top:83.08%;height:5.62%;border-radius:26px;border:1px solid rgba(211,221,231,.40);background:linear-gradient(180deg,#2f4cbf 0%,#1b3590 46%,#0c1f5e 100%);color:#fff;font-size:clamp(18px,3.7vw,22px);line-height:1;font-weight:950;white-space:nowrap;box-shadow:inset 0 0 0 3px rgba(255,255,255,.035),0 10px 22px rgba(0,0,0,.28);cursor:pointer}
+.action:disabled{opacity:.57;cursor:default}
+.status{position:absolute;left:10%;right:10%;top:89.45%;text-align:center;min-height:20px;color:#dbe63c;font-size:11px}
+.debug{display:none}
+
+@media(max-width:380px){
+  .wallet,.stake-box{padding:0 7px}
+  .deposit{width:31px;height:31px}
+  .side-actions button{width:59px;min-height:52px}
+  .payout-card{left:2.5%;width:32.5%}
+}
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <div class="bg-layer"></div>
+  <div class="pixi-layer" id="pixi-host"><img src="assets/field-clean.webp" style="position:absolute;left:50.000%;top:41.268%;width:68.013%;height:32.536%;transform:translate(-50%,-50%);object-fit:fill"><img src="assets/chuko_01.webp" style="position:absolute;left:41.073%;top:37.679%;width:13.815%;transform:translate(-50%,-50%) rotate(-8deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_02.webp" style="position:absolute;left:47.024%;top:36.962%;width:13.815%;transform:translate(-50%,-50%) rotate(0deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_03.webp" style="position:absolute;left:52.976%;top:36.962%;width:13.815%;transform:translate(-50%,-50%) rotate(8deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_04.webp" style="position:absolute;left:58.927%;top:37.679%;width:13.815%;transform:translate(-50%,-50%) rotate(16deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_05.webp" style="position:absolute;left:39.160%;top:40.969%;width:13.815%;transform:translate(-50%,-50%) rotate(-16deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_06.webp" style="position:absolute;left:44.899%;top:41.029%;width:13.815%;transform:translate(-50%,-50%) rotate(-8deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_01.webp" style="position:absolute;left:55.101%;top:41.029%;width:13.815%;transform:translate(-50%,-50%) rotate(0deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_02.webp" style="position:absolute;left:60.840%;top:40.969%;width:13.815%;transform:translate(-50%,-50%) rotate(8deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_03.webp" style="position:absolute;left:41.073%;top:44.498%;width:13.815%;transform:translate(-50%,-50%) rotate(16deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_04.webp" style="position:absolute;left:47.024%;top:45.096%;width:13.815%;transform:translate(-50%,-50%) rotate(-16deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_05.webp" style="position:absolute;left:52.976%;top:45.096%;width:13.815%;transform:translate(-50%,-50%) rotate(-8deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/chuko_06.webp" style="position:absolute;left:58.927%;top:44.498%;width:13.815%;transform:translate(-50%,-50%) rotate(0deg);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/khan_01.webp" style="position:absolute;left:50.000%;top:41.388%;width:15.515%;transform:translate(-50%,-50%);filter:drop-shadow(0 6px 5px #0008)"><img src="assets/saka_01.webp" style="position:absolute;left:50.000%;top:67.703%;width:18.278%;transform:translate(-50%,-50%);filter:drop-shadow(0 8px 7px #0008)"></div>
+
+  <div class="ui-layer">
+    <div class="topbar">
+      <div class="brand"><span class="x2">X2</span> <span class="loto">LOTO</span></div>
+      <div class="wallet">
+        <div class="wallet-meta"><div class="small-label">Баланс</div><div class="amount" id="balance-value">13 350 сом</div></div>
+        <button class="deposit" id="deposit-btn" aria-label="deposit">+</button>
+      </div>
+      <div class="stake-box clickable" id="stake-box">
+        <div class="stake-meta"><div class="small-label">Ставка</div><div class="amount" id="stake-value">100 сом</div></div>
+        <div class="stake-caret">⌄</div>
+        <div class="stake-menu" id="stake-menu"></div>
+      </div>
+    </div>
+
+    <div class="titleblock">
+      <div class="game-title">ЧҮКӨ</div>
+    </div>
+
+    <div class="mode-switch" id="mode-switch">
+      <button data-mode="real" class="active">REAL</button><button data-mode="demo">DEMO</button>
+    </div>
+
+    <div class="payout-card">
+      <div class="payout-title">ВЫИГРЫШИ</div>
+      <div class="payout-grid">
+        <div class="payout-item"><span>1 чүкө</span><strong>×1</strong></div>
+        <div class="payout-item"><span>2 чүкө</span><strong>×1.5</strong></div>
+        <div class="payout-item"><span>3 чүкө</span><strong>×2</strong></div>
+        <div class="payout-item"><span>4 чүкө</span><strong>×5</strong></div>
+        <div class="payout-item"><span>5 чүкө</span><strong>×10</strong></div>
+        <div class="payout-item payout-khan"><span>ХАН</span><strong>×5</strong></div>
+      </div>
+    </div>
+
+    <div class="side-actions">
+      <button id="help-btn">Как играть</button>
+      <button id="games-btn">Мои игры</button>
+    </div>
+
+    <div class="help-modal" id="help-modal" aria-hidden="true">
+      <div class="help-dialog">
+        <button class="help-close" id="help-close" aria-label="close">×</button>
+        <div class="help-title" data-i18n="helpTitle"></div>
+        <div class="help-step"><span class="help-num">1</span><span data-i18n="helpPull"></span></div>
+        <div class="help-step"><span class="help-num">2</span><span data-i18n="helpScenario"></span></div>
+        <div class="help-step"><span class="help-num">3</span><span data-i18n="helpMultiplier"></span></div>
+        <div class="help-step"><span class="help-num">4</span><span data-i18n="helpKhan"></span></div>
+        <button class="help-ok" id="help-ok" data-i18n="helpOk"></button>
+      </div>
+    </div>
+
+    <div class="payout-modal" id="payout-modal" aria-hidden="true">
+      <div class="payout-dialog">
+        <button class="payout-close" id="payout-close" aria-label="close">×</button>
+        <div class="payout-modal-title" data-i18n="payoutTable">Таблица выплат</div>
+        <div class="payout-grid payout-grid-modal">
+          <div class="payout-item"><span>1 чүкө</span><strong>×1</strong></div>
+          <div class="payout-item"><span>2 чүкө</span><strong>×1.5</strong></div>
+          <div class="payout-item"><span>3 чүкө</span><strong>×2</strong></div>
+          <div class="payout-item"><span>4 чүкө</span><strong>×5</strong></div>
+          <div class="payout-item"><span>5 чүкө</span><strong>×10</strong></div>
+          <div class="payout-item payout-khan"><span>ХАН</span><strong>×5</strong></div>
+        </div>
+        <button class="payout-ok" id="payout-ok" data-i18n="helpOk">Понятно</button>
+      </div>
+    </div>
+
+    <div class="tickets-modal" id="tickets-modal" aria-hidden="true">
+      <div class="tickets-dialog">
+        <button class="tickets-close" id="tickets-close" aria-label="close">×</button>
+        <div class="tickets-title" data-i18n="recentTickets">Последние билеты</div>
+        <div class="tickets-list" id="tickets-list"></div>
+        <button class="tickets-ok" id="tickets-ok" data-i18n="helpOk">Понятно</button>
+      </div>
+    </div>
+
+
+    <div class="result-toast" id="result-toast"></div>
+
+    <div class="score">
+      <div class="score-cell"><div class="score-label">ВЫБИТО</div><div class="score-value" id="score-knocked">0</div></div>
+      <div class="score-cell"><div class="score-label">ВЫИГРЫШ</div><div class="score-value accent" id="score-win">0 сом</div></div>
+      <div class="score-cell"><div class="score-label">ХАН</div><div class="score-value gold" id="score-khan">—</div></div>
+    </div>
+
+    <button class="action" id="action-btn">Новая игра</button>
+    <div class="status" id="status"></div>
+    <div class="debug">v20.34 · PixiJS 8.20.1 · Matter.js 0.20.0</div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+</body>
+</html>

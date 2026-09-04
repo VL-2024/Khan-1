@@ -2049,7 +2049,7 @@
       await refreshBalance();
       resetBoard('IDLE');
       window.X2ChukoV20 = {
-        version:'20.33',
+        version:'20.34',
         renderer:'PixiJS',
         physics:'Matter.js',
         getState:()=>({state,gameMode,language,currency,currencyDisplay,stake,balance,ticket,scenario:ticket?.scenario,knocked:round?.knocked,khanOut:round?.khanOut}),
@@ -2057,8 +2057,8 @@
         reloadBalance:refreshBalance
       };
     } catch(err) {
-      console.error('[CHUKO v20.33 boot]',err);
-      state='error'; showStatus('v20.33 boot error: '+(err.message||err)); renderState();
+      console.error('[CHUKO v20.34 boot]',err);
+      state='error'; showStatus('v20.34 boot error: '+(err.message||err)); renderState();
     }
   }
 

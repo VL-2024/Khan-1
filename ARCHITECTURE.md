@@ -1,47 +1,92 @@
-# ЧҮКӨ v20 — Архитектура
+# v20.34 architecture
 
-Структура слоёв:
+## Principle
 
-1. CSS background (`bg-layer`)
-2. PixiJS `fieldLayer`
-3. PixiJS `pieceLayer`
-4. PixiJS `outLayer` — выбитые элементы остаются здесь до новой игры
-5. PixiJS `fxLayer`
-6. DOM UI (`ui-layer`)
+LMS determines ticket outcome. PixiJS and Matter.js only render it.
 
-Физика: Matter.js 0.20.0.
-Рендер: PixiJS 8.20.1.
+### LMS layer
 
-## LMS
+`lms-adapter.js`
 
-`lms-adapter.js` отвечает за загрузку баланса, покупку билета, DEMO-билет и события LMS.
-Денежный результат всегда авторитетно приходит из LMS.
+Responsible for:
+- session;
+- balance;
+- ticket request;
+- scenario;
+- win;
+- final balance;
+- demo ticket in demo mode;
+- iframe postMessage events.
 
-## Сценарии
+### Rendering layer
 
-Все сценарии находятся в `src/scenario-config.js`.
-`game.js` только визуализирует сценарий.
+`src/game.js` + PixiJS
 
-## Визуальные настройки
+Containers:
+- `fieldLayer`;
+- `pieceLayer`;
+- `fxLayer`.
 
-Основные параметры вынесены в `src/visual-config.js`.
+### Physics layer
 
-## Автоигра
+Matter.js bodies:
+- 12 `chuko-*` bodies;
+- 1 `khan` body;
+- 1 `saka` body.
 
-Автоигра запускает обычную последовательность отдельных билетов.
-В REAL каждый раунд делает новый запрос `LMS.createTicket(...)`.
+No gravity. Fixed 60 Hz physics step.
 
-## Локальная история
+### Scenario enforcement
 
-После завершения раунда локально сохраняются только `{ticketId, win}`.
-Количество хранится в `config.js → localTicketHistoryLimit`.
-REAL и DEMO хранятся раздельно.
-Полная история остаётся в личном кабинете LMS.
+| scenario | result |
+|---|---|
+| 1 | 0 regular chükö |
+| 2 | 1 regular chükö |
+| 3 | 2 regular chükö |
+| 4 | 5 regular chükö |
+| 5 | 5 regular chükö + KHAN |
 
-## Audio/UI layer — v20.31
+Matter.js handles collisions and motion, but designated scenario targets are selected before the throw. Non-target pieces are kept inside the field, so physics can never turn a losing/other scenario into a different lottery result.
 
-Audio изолирован от Matter.js и LMS. Номер билета рендерится из `ticket.ticketId`.
+### Reproducibility
 
-## Local recent ticket history — v20.32/v20.33
+Target selection, initial piece variations and impulse directions are seeded from:
 
-Локальный cache используется только для UI и не является авторитетной историей транзакций.
+```text
+ticketId + scenario
+```
+
+This allows the same ticket to be visually replayed consistently.
+
+## UI separation
+
+HTML/CSS UI does not depend on `background.webp`.
+
+This means future redesigns can independently replace:
+- page background;
+- field asset;
+- bone assets;
+- typography/UI theme;
+without changing LMS logic or physics.
+
+Field art now uses `assets/field-clean.webp` with alpha; Pixi also applies an oval mask. The page background stays independent.
+
+
+### Scenario layer — v20.34
+
+`src/scenario-config.js` является единым источником visual scenario mapping.
+`lms-adapter.js` использует его для проверки scenario id и DEMO/mock цикла.
+`game.js` использует его только для `{regular, khan}` visual plan.
+Монетарный `win` остаётся LMS-authoritative.
+
+### Audio/UI layer — v20.34
+
+Audio is isolated from Matter.js and LMS logic.
+`renderState()` observes state transitions for SFX only; no physics function
+depends on audio. Ticket number is rendered from `ticket.ticketId`.
+
+### Local recent ticket history — v20.34
+
+A bounded localStorage cache stores only `{ticketId, win}` after `ROUND_COMPLETE`.
+REAL and DEMO use separate keys. This is UI convenience only and is not an
+authoritative transaction history; authoritative/full history remains in LMS.

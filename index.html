@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<title>ЧҮКӨ v20.33 — PixiJS + Matter.js</title>
+<title>ЧҮКӨ v20.34 — PixiJS + Matter.js</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -27,22 +27,24 @@
     </div>
 
     <div class="bottom-tools">
-      <div class="mode-switch hidden" id="mode-switch">
-        <button data-mode="real">REAL</button><button data-mode="demo">DEMO</button>
-      </div>
-
-      <div class="info-wrap">
-        <button class="info-btn" id="info-btn" type="button" data-i18n="info">Инфо</button>
-
-        <div class="info-menu" id="info-menu" aria-hidden="true">
-          <button id="info-payout" type="button" data-i18n="payoutTable">Таблица выплат</button>
-          <button id="info-how" type="button" data-i18n="howToPlay">Как играть</button>
-          <button id="info-tickets" type="button" data-i18n="myTickets">Мои билеты</button>
+      <div class="bottom-controls">
+        <div class="mode-switch hidden" id="mode-switch">
+          <button data-mode="real">REAL</button><button data-mode="demo">DEMO</button>
         </div>
-      </div>
 
-      <button class="audio-toggle" id="sound-btn" type="button" aria-label="Звук" title="Звук">🔊</button>
-      <button class="audio-toggle" id="music-btn" type="button" aria-label="Музыка" title="Музыка">♫×</button>
+        <div class="info-wrap">
+          <button class="info-btn" id="info-btn" type="button" data-i18n="info">Инфо</button>
+
+          <div class="info-menu" id="info-menu" aria-hidden="true">
+            <button id="info-payout" type="button" data-i18n="payoutTable">Таблица выплат</button>
+            <button id="info-how" type="button" data-i18n="howToPlay">Как играть</button>
+            <button id="info-tickets" type="button" data-i18n="myTickets">Мои билеты</button>
+          </div>
+        </div>
+
+        <button class="audio-toggle" id="sound-btn" type="button" aria-label="Звук" title="Звук">🔊</button>
+        <button class="audio-toggle" id="music-btn" type="button" aria-label="Музыка" title="Музыка">♫×</button>
+      </div>
 
       <div class="ticket-number" id="ticket-number" title="">№ —</div>
     </div>
@@ -84,6 +86,7 @@
       </div>
     </div>
 
+
     <div class="result-toast" id="result-toast"></div>
 
     <div class="score">
@@ -111,7 +114,7 @@
     </div>
 
     <div class="status" id="status"></div>
-    <div class="debug">v20.33 · PixiJS 8.20.1 · Matter.js 0.20.0</div>
+    <div class="debug">v20.34 · PixiJS 8.20.1 · Matter.js 0.20.0</div>
   </div>
 </div>
 

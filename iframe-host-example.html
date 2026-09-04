@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<title>ЧҮКӨ v20 iframe host</title>
+<style>html,body{margin:0;background:#111}iframe{display:block;border:0;width:min(100vw,560px);height:100vh;margin:auto}</style>
+<iframe id="game" src="./index.html"></iframe>
+<script>
+const frame = document.getElementById('game');
+const GAME_ORIGIN = location.origin;
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== GAME_ORIGIN) return;
+  if (event.data?.source !== 'X2_CHUKO') return;
+
+  if (event.data.type === 'X2_GAME_READY') {
+    frame.contentWindow.postMessage({
+      type: 'X2_LMS_INIT',
+      session: 'DEMO-LMS-SESSION',
+      gameId: 'CHUKO',
+      denominations: [25, 50, 100],
+      denomination: 50,
+      language: 'RU',
+      currency: 'KGS',
+      currencyDisplay: 'сом',
+      mode: 'real',
+      demoAllowed: true,
+      demoBalance: 10000
+    }, GAME_ORIGIN);
+  }
+
+  if (event.data.type === 'X2_GAME_DEPOSIT_REQUEST') {
+    console.log('Open LMS deposit UI');
+  }
+});
+</script>
