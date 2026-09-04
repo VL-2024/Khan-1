@@ -168,7 +168,7 @@ body{display:flex;justify-content:center;align-items:flex-start;overflow:auto}
   width:100%;
   padding:0 0 0 8px;
   line-height:28px;
-  font-size:clamp(7px,1.55vw,9px)
+  font-size:clamp(15px,1.55vw,9px)
 }
 
 .info-menu{
