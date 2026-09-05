@@ -791,10 +791,11 @@
     const padding = Math.max(0, Number(autoFx.endPaddingMs ?? 180));
     const confetti = fx.confetti || {};
 
-    // Confetti falls for up to maxDurationMs; add the same cleanup safety
-    // interval used by launchConfetti().
+    // Pixi confetti lifetime is the configured max duration plus the
+    // maximum stagger delay used in launchConfetti().
+    const confettiDelay = round?.khanOut ? 480 : 280;
     const confettiMs =
-      Math.max(600, Number(confetti.maxDurationMs ?? 3000)) + 900;
+      Math.max(700, Number(confetti.maxDurationMs ?? 2600)) + confettiDelay;
 
     let fireworksMs = 0;
 
@@ -960,56 +961,115 @@
     return V.tuning?.effects || {};
   }
 
+function isMobileEffectsDevice() {
+    const ua = navigator.userAgent || '';
+    const isiOS = /iPhone|iPad|iPod/i.test(ua);
+    const narrow = Math.min(window.innerWidth || 9999, window.innerHeight || 9999) < 700;
+    return isiOS || narrow;
+  }
+
   function launchConfetti({ khan = false } = {}) {
-    if (!ui.celebration) return;
+    if (!fxLayer || !app?.ticker) return;
 
     const cfg = effectConfig().confetti || {};
-    const count = Math.max(0, Math.round(
-      khan ? Number(cfg.khanCount ?? 72) : Number(cfg.normalCount ?? 24)
+
+    const requested = Math.max(0, Math.round(
+      khan ? Number(cfg.khanCount ?? 54) : Number(cfg.normalCount ?? 22)
     ));
 
-    const minDur = Math.max(600, Number(cfg.minDurationMs ?? 1700));
-    const maxDur = Math.max(minDur, Number(cfg.maxDurationMs ?? 3000));
-    const minSize = Math.max(2, Number(cfg.minSize ?? 5));
-    const maxSize = Math.max(minSize, Number(cfg.maxSize ?? 11));
-    const drift = Math.max(0, Number(cfg.driftPx ?? 90));
-    const topSpread = Math.max(0, Number(cfg.startSpreadTopPx ?? 35));
+    const mobile = isMobileEffectsDevice();
+    const mobileScale = Math.max(.2, Math.min(1, Number(cfg.mobileParticleScale ?? .60)));
+    const mobileCap = Math.max(8, Math.round(Number(cfg.mobileMaxParticles ?? 34)));
 
-    const palette = khan
-      ? ['#ffd45d','#dbe63c','#ffffff','#ff9f3f','#5fb4ff','#f26cff']
-      : ['#dbe63c','#ffffff','#5fb4ff','#ffd45d'];
-
-    for (let i = 0; i < count; i++) {
-      const piece = document.createElement('i');
-      piece.className = 'confetti-piece';
-
-      const left = Math.random() * 100;
-      const startTop = -(12 + Math.random() * topSpread);
-      const dx = (Math.random() - .5) * drift;
-      const rot = (Math.random() > .5 ? 1 : -1) * (540 + Math.random() * 900);
-      const flip = (Math.random() > .5 ? 1 : -1) * (360 + Math.random() * 720);
-      const dur = minDur + Math.random() * (maxDur - minDur);
-      const delay = Math.random() * (khan ? 520 : 320);
-      const w = minSize + Math.random() * (maxSize - minSize);
-      const h = w * (1.35 + Math.random() * .7);
-
-      piece.style.background = palette[i % palette.length];
-      piece.style.setProperty('--left', `${left}%`);
-      piece.style.setProperty('--start-top', `${startTop}px`);
-      piece.style.setProperty('--dx', `${dx}px`);
-      piece.style.setProperty('--rot', `${rot}deg`);
-      piece.style.setProperty('--flip', `${flip}deg`);
-      piece.style.setProperty('--dur', `${dur}ms`);
-      piece.style.setProperty('--delay', `${delay}ms`);
-      piece.style.setProperty('--w', `${w}px`);
-      piece.style.setProperty('--h', `${h}px`);
-
-      ui.celebration.appendChild(piece);
+    let count = requested;
+    if (mobile) {
+      count = Math.min(mobileCap, Math.max(8, Math.round(requested * mobileScale)));
     }
 
-    registerResultFxTimeout(() => {
-      if (ui.celebration) ui.celebration.innerHTML = '';
-    }, maxDur + 900);
+    const minDur = Math.max(700, Number(cfg.minDurationMs ?? 1600));
+    const maxDur = Math.max(minDur, Number(cfg.maxDurationMs ?? 2600));
+    const minSize = Math.max(2, Number(cfg.minSize ?? 4));
+    const maxSize = Math.max(minSize, Number(cfg.maxSize ?? 10));
+    const driftPx = Math.max(0, Number(cfg.driftPx ?? 75));
+    const gravity = Number(cfg.gravity ?? .045);
+    const spinMin = Math.max(0, Number(cfg.spinMin ?? .06));
+    const spinMax = Math.max(spinMin, Number(cfg.spinMax ?? .18));
+
+    const palette = khan
+      ? [0xffd45d,0xdbe63c,0xffffff,0xff9f3f,0x5fb4ff,0xf26cff]
+      : [0xdbe63c,0xffffff,0x5fb4ff,0xffd45d];
+
+    const particles = [];
+    const screenW = V.designWidth;
+    const screenH = V.designHeight;
+
+    for (let i=0; i<count; i++) {
+      const size = minSize + Math.random() * (maxSize - minSize);
+      const h = size * (1.25 + Math.random()*.7);
+
+      const g = new PIXI.Graphics();
+      g.__resultFx = true;
+      g.rect(-size/2, -h/2, size, h).fill({
+        color: palette[i % palette.length],
+        alpha: 1
+      });
+
+      const x = Math.random() * screenW;
+      const y = -20 - Math.random() * 100;
+      g.position.set(x, y);
+      g.rotation = Math.random() * Math.PI * 2;
+      fxLayer.addChild(g);
+
+      const duration = minDur + Math.random() * (maxDur - minDur);
+      const vx = (Math.random() - .5) * (driftPx / 55);
+      const vy = screenH / (duration / 16.67) * (.88 + Math.random()*.30);
+      const spin = (Math.random()>.5?1:-1) * (spinMin + Math.random()*(spinMax-spinMin));
+      const delay = Math.random() * (khan ? 480 : 280);
+
+      particles.push({
+        g,
+        x, y,
+        vx, vy,
+        spin,
+        gravity,
+        duration,
+        age: -delay,
+        phase: Math.random()*Math.PI*2,
+        wobble: .45 + Math.random()*.9
+      });
+    }
+
+    const tick = (tk) => {
+      let alive = 0;
+      const step = tk.deltaMS / 16.67;
+
+      for (const p of particles) {
+        if (!p.g || p.g.destroyed) continue;
+
+        p.age += tk.deltaMS;
+        if (p.age < 0) continue;
+
+        const t = p.age / p.duration;
+        if (t >= 1 || p.y > screenH + 80) {
+          if (!p.g.destroyed) p.g.destroy();
+          continue;
+        }
+
+        alive++;
+        p.vy += p.gravity * step;
+        p.x += (p.vx + Math.sin(p.phase + p.age*.004)*p.wobble) * step;
+        p.y += p.vy * step;
+
+        if (p.g.destroyed) continue;
+        p.g.position.set(p.x, p.y);
+        p.g.rotation += p.spin * step;
+        p.g.alpha = t > .82 ? Math.max(0, (1-t)/.18) : 1;
+      }
+
+      if (!alive) unregisterResultFxTicker(tick);
+    };
+
+    registerResultFxTicker(tick);
   }
 
   function createFireworkParticle(x, y, color, vx, vy, lifeMs, gravity) {
@@ -1432,6 +1492,7 @@
     const rng = seeded(seedValue || 'CHUKO');
     const cx = V.field.x;
     const cy = V.field.y;
+    const pileCY = cy + Number(V.tuning?.pileOffsetY ?? 0);
     // Compact v19-style pile, but centers are separated enough for Matter.js
     // so the pieces do not self-explode before SAKA reaches them.
     const basePositions = [
@@ -1470,7 +1531,7 @@
       }
     }
 
-    const khanBody = makePieceBody(cx + (rng()-.5)*4, cy + 2 + (rng()-.5)*4, V.pieces.khanRadius, 'khan');
+    const khanBody = makePieceBody(cx + (rng()-.5)*4, pileCY + 2 + (rng()-.5)*4, V.pieces.khanRadius, 'khan');
     Body.setAngle(khanBody, (rng()-.5)*0.45);
     const khanSprite = makeSprite(V.assets.khan[Math.floor(rng()*V.assets.khan.length)], V.pieces.khanSpriteSize);
     khan = { body:khanBody, sprite:khanSprite, target:false, out:false, launched:false, detached:false, finalOutX:null, finalOutY:null, finalOutAngle:null, outDistance:null, id:'khan' };
@@ -1479,7 +1540,7 @@
 
     positions.forEach((pos, i) => {
       const x = cx + pos[0] + (rng()-.5)*6;
-      const y = cy + pos[1] + (rng()-.5)*6;
+      const y = pileCY + pos[1] + (rng()-.5)*6;
       const body = makePieceBody(x, y, V.pieces.regularRadius, `chuko-${i}`);
       Body.setAngle(body, (rng()-.5)*0.75);
       const sprite = makeSprite(V.assets.chuko[Math.floor(rng()*V.assets.chuko.length)], V.pieces.regularSpriteSize);
@@ -1514,16 +1575,22 @@
     syncSprites();
   }
 
-  function prepareTicketBoard(data) {
+      function prepareTicketBoard(data) {
     const seedValue = `${data.ticketId}|${data.scenario}`;
     resetBoard(seedValue);
     const rng = seeded(seedValue);
     const plan = scenarioPlan(data.scenario);
     round.plan = plan;
-    const ids = shuffle(chuko.map(p => p.id), rng).slice(0, plan.regular);
+
+    const ids = shuffle(chuko.map(p => p.id),rng).slice(0,plan.regular);
     round.targetIds = ids;
     chuko.forEach(p => p.target = ids.includes(p.id));
     khan.target = plan.khan;
+
+    // Landing is calculated only from guide direction + pull power.
+    round.landingPoint = {x:V.field.x,y:V.field.y};
+    round.guideDirection = {x:0,y:-1};
+    round.pullPower = .65;
   }
 
   function clampSpeed(body) {
@@ -1686,7 +1753,217 @@
     }
   }
 
-  function drawAimGuide() {
+    function playableLandingRadius() {
+    const margin = Math.max(
+      Number(V.pieces?.sakaRadius ?? 42) + 4,
+      Number(V.tuning.landingCircleMargin ?? 48)
+    );
+    return Math.max(20, Number(V.field.innerRadius ?? 220) - margin);
+  }
+
+  function clampLandingPointInsideCircle(point) {
+    const cx = V.field.x;
+    const cy = V.field.y;
+
+    // Extra 2px safety on top of the full-SAKA margin.
+    const maxRadius = Math.max(18, playableLandingRadius() - 2);
+
+    let dx = Number(point?.x ?? cx) - cx;
+    let dy = Number(point?.y ?? cy) - cy;
+    const d = Math.hypot(dx, dy);
+
+    if (!Number.isFinite(d) || d < 1e-6) {
+      return { x:cx, y:cy };
+    }
+
+    if (d > maxRadius) {
+      dx = dx / d * maxRadius;
+      dy = dy / d * maxRadius;
+    }
+
+    return {
+      x: cx + dx,
+      y: cy + dy
+    };
+  }
+
+  function normalizeVec(x, y, fallbackX=0, fallbackY=-1) {
+    const len = Math.hypot(x, y);
+    if (len < 1e-6) return { x:fallbackX, y:fallbackY };
+    return { x:x/len, y:y/len };
+  }
+
+  function rotateVec(v, angle) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    return { x:v.x*c-v.y*s, y:v.x*s+v.y*c };
+  }
+
+  function signedAngle(from, to) {
+    return Math.atan2(
+      from.x*to.y - from.y*to.x,
+      from.x*to.x + from.y*to.y
+    );
+  }
+
+  function rayCircleIntersections(origin, dir, center, radius) {
+    const ox = origin.x-center.x;
+    const oy = origin.y-center.y;
+
+    const b = 2*(ox*dir.x + oy*dir.y);
+    const c = ox*ox + oy*oy - radius*radius;
+    const disc = b*b - 4*c;
+
+    if (disc < 0) return null;
+
+    const root = Math.sqrt(Math.max(0,disc));
+    const t1 = (-b-root)/2;
+    const t2 = (-b+root)/2;
+    const near = Math.min(t1,t2);
+    const far = Math.max(t1,t2);
+
+    if (far <= 0) return null;
+
+    return {
+      near:Math.max(0,near),
+      far
+    };
+  }
+
+  function fieldAimGeometry() {
+    const origin = {x:V.sakaStart.x,y:V.sakaStart.y};
+    const center = {x:V.field.x,y:V.field.y};
+    const radius = playableLandingRadius();
+
+    const toCenter = normalizeVec(
+      center.x-origin.x,
+      center.y-origin.y
+    );
+
+    const distance = Math.hypot(
+      center.x-origin.x,
+      center.y-origin.y
+    );
+
+    const tangentHalfAngle = Math.asin(
+      Math.max(
+        0,
+        Math.min(.999,radius/Math.max(radius+1,distance))
+      )
+    );
+
+    const safety =
+      Math.max(0,Number(V.tuning.aimCircleSafetyDeg ?? 2.5)) *
+      Math.PI/180;
+
+    return {
+      origin,
+      center,
+      radius,
+      toCenter,
+      halfAngle:Math.max(3*Math.PI/180,tangentHalfAngle-safety)
+    };
+  }
+
+  function clampThrowDirectionToCircle(dir) {
+    const geo = fieldAimGeometry();
+    const desired = normalizeVec(
+      dir.x,
+      dir.y,
+      geo.toCenter.x,
+      geo.toCenter.y
+    );
+
+    let angle = signedAngle(geo.toCenter,desired);
+    angle = Math.max(-geo.halfAngle,Math.min(geo.halfAngle,angle));
+
+    return rotateVec(geo.toCenter,angle);
+  }
+
+  function landingForDirectionAndPower(dir,power01) {
+    const geo = fieldAimGeometry();
+    const safeDir = clampThrowDirectionToCircle(dir);
+
+    let hits = rayCircleIntersections(
+      geo.origin,
+      safeDir,
+      geo.center,
+      geo.radius
+    );
+
+    if (!hits) {
+      hits = rayCircleIntersections(
+        geo.origin,
+        geo.toCenter,
+        geo.center,
+        geo.radius
+      );
+    }
+
+    const minPower = Math.max(
+      0,
+      Math.min(.45,Number(V.tuning.landingPowerMin ?? .08))
+    );
+    const exponent = Math.max(
+      .35,
+      Number(V.tuning.landingPowerExponent ?? 1)
+    );
+
+    const power = Math.max(0,Math.min(1,Number(power01)||0));
+    const mapped =
+      minPower + (1-minPower)*Math.pow(power,exponent);
+
+    const t = hits.near + (hits.far-hits.near)*mapped;
+
+    const rawPoint = {
+      x:geo.origin.x+safeDir.x*t,
+      y:geo.origin.y+safeDir.y*t
+    };
+
+    return {
+      dir:safeDir,
+      point:clampLandingPointInsideCircle(rawPoint),
+      nearT:hits.near,
+      farT:hits.far,
+      t,
+      power
+    };
+  }
+
+  function actualThrowFromGuide(guideDir,power01) {
+    const geo = fieldAimGeometry();
+    const guide = clampThrowDirectionToCircle(guideDir);
+    const guideAngle = signedAngle(geo.toCenter,guide);
+
+    const leftRoom = guideAngle + geo.halfAngle;
+    const rightRoom = geo.halfAngle - guideAngle;
+
+    const maxDev =
+      Math.max(0,Math.min(15,Number(V.tuning.throwDeviationMaxDeg ?? 10))) *
+      Math.PI/180;
+
+    const rng = seeded(
+      `${round?.seed || ticket?.ticketId || 'ROUND'}|throw-deviation`
+    );
+
+    let deviation = (rng()*2-1)*maxDev;
+
+    deviation = Math.max(
+      -Math.min(maxDev,leftRoom),
+      Math.min(Math.min(maxDev,rightRoom),deviation)
+    );
+
+    const actualDir = rotateVec(guide,deviation);
+    const landing = landingForDirectionAndPower(actualDir,power01);
+
+    return {
+      ...landing,
+      guideDir:guide,
+      deviation
+    };
+  }
+
+    function drawAimGuide() {
     if (!fxLayer) return;
 
     if (!aimGuide || aimGuide.destroyed) {
@@ -1696,44 +1973,56 @@
 
     aimGuide.clear();
 
-    if (state !== 'ready' || !drag?.active || !drag.p || !saka) return;
+    if (state !== 'ready' || !drag?.active || !drag.guide) return;
 
-    const dx = V.sakaStart.x - drag.p.x;
-    const dy = V.sakaStart.y - drag.p.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 6) return;
+    const power = Math.max(0,Math.min(1,drag.power||0));
+    if (power < .04) return;
 
-    const ux = dx / len;
-    const uy = dy / len;
-    const power = Math.min(1, len / 115);
+    const preview = landingForDirectionAndPower(
+      drag.guide,
+      power
+    );
 
-    // Same visual principle as v11: dashed line in the chosen launch direction.
     const startX = V.sakaStart.x;
-    const startY = V.sakaStart.y - 46;
-    const guideLen = 68 + power * 92;
+    const startY = V.sakaStart.y-46;
+
+    const vx = preview.point.x-startX;
+    const vy = preview.point.y-startY;
+    const fullLen = Math.hypot(vx,vy);
+    if (fullLen < 1) return;
+
+    const ux = vx/fullLen;
+    const uy = vy/fullLen;
+
+    const visibleLen = Math.min(
+      fullLen,
+      210 + power*120
+    );
 
     const dash = 15;
     const gap = 10;
 
-    for (let d = 0; d < guideLen; d += dash + gap) {
-      const d2 = Math.min(guideLen, d + dash);
-
+    for (let d=0; d<visibleLen; d+=dash+gap) {
+      const d2 = Math.min(visibleLen,d+dash);
       aimGuide
-        .moveTo(startX + ux * d, startY + uy * d)
-        .lineTo(startX + ux * d2, startY + uy * d2);
+        .moveTo(startX+ux*d,startY+uy*d)
+        .lineTo(startX+ux*d2,startY+uy*d2);
     }
 
     aimGuide.stroke({
-      color: 0xffffff,
-      alpha: 0.78,
-      width: 5,
-      cap: 'round'
+      color:0xffffff,
+      alpha:.82,
+      width:5,
+      cap:'round'
     });
 
-    // Small luminous endpoint makes the selected direction easier to read.
     aimGuide
-      .circle(startX + ux * guideLen, startY + uy * guideLen, 5.5)
-      .fill({ color: 0xdbe63c, alpha: 0.92 });
+      .circle(
+        startX+ux*visibleLen,
+        startY+uy*visibleLen,
+        5.5
+      )
+      .fill({color:0xdbe63c,alpha:.94});
   }
 
   function syncSprites() {
@@ -1773,6 +2062,11 @@
 
   function onCollisionStart(event) {
     if (!round?.active || round.impact) return;
+
+    // v20.43: SAKA impact is no longer triggered by touching an outer
+    // chuko from the side. Landing is resolved in updateRound().
+    if (V.tuning.sakaAirborneNoCollision !== false) return;
+
     for (const pair of event.pairs) {
       const a = pair.bodyA.label;
       const b = pair.bodyB.label;
@@ -1789,9 +2083,16 @@
     round.impact = true;
     round.impactAt = now;
 
+    // Make the visible/contact point identical to the planned landing point.
+    // This prevents any remaining "side hit" impression.
+    const plannedLanding = round?.landingPoint || { x:V.field.x, y:V.field.y };
+    if (saka?.body && V.tuning.sakaAirborneNoCollision !== false) {
+      Body.setPosition(saka.body, plannedLanding);
+    }
+
     const rng = seeded(`${round.seed}|impact-v209`);
-    const sx = saka?.body?.position?.x ?? V.field.x;
-    const sy = saka?.body?.position?.y ?? (V.field.y + 140);
+    const sx = saka?.body?.position?.x ?? plannedLanding.x;
+    const sy = saka?.body?.position?.y ?? plannedLanding.y;
 
     const svx = saka?.body?.velocity?.x || 0;
     const svy = saka?.body?.velocity?.y || -1;
@@ -1804,6 +2105,14 @@
     const tangentBase = V.tuning.scatterTangential || 2.7;
     const eject = V.tuning.chukoEjectSpeed || 16.6;
     const ejectTangential = V.tuning.chukoEjectTangential || 3.4;
+
+    // v20.42: contact behaves more like a top-down hit into the pile.
+    // Most of the energy expands radially from the actual landing point,
+    // while only a small share continues in the SAKA travel direction.
+    const contact = round?.landingPoint || { x:sx, y:sy };
+    const radialFromContact = Number(V.tuning.impactRadialFromContact ?? 10.2);
+    const forwardShare = Math.max(0, Math.min(1, Number(V.tuning.impactForwardShare ?? .22)));
+    const randomScatter = Math.max(0, Number(V.tuning.impactRandomScatter ?? 2.6));
 
     chuko.forEach((p, i) => {
       if (p.out) return;
@@ -1825,9 +2134,27 @@
       const distToSaka = Math.hypot(dx, dy);
       const proximity = Math.max(.78, Math.min(1.25, 1.22 - distToSaka / 700));
 
-      const forward = scatter * (.32 + rng() * .26) * proximity * boost;
-      const radial = scatter * (.66 + rng() * .52) * proximity;
+      // Local explosion vector from the actual landing point.
+      let cdx = px - contact.x;
+      let cdy = py - contact.y;
+      let cLen = Math.hypot(cdx, cdy);
+
+      if (cLen < 8) {
+        const a = rng() * Math.PI * 2;
+        cdx = Math.cos(a);
+        cdy = Math.sin(a);
+        cLen = 1;
+      }
+
+      const cnx = cdx / cLen;
+      const cny = cdy / cLen;
+
+      const forward = scatter * (.32 + rng() * .26) * proximity * boost * forwardShare;
+      const radial = scatter * (.50 + rng() * .38) * proximity;
+      const contactBurst = radialFromContact * (.72 + rng() * .52) * proximity;
       const tangent = tangentBase * (.35 + rng() * .95) * tangentSign;
+      const jitterX = (rng() - .5) * randomScatter;
+      const jitterY = (rng() - .5) * randomScatter;
 
       if (p.target) {
         const outSpeed = eject * (.96 + rng() * .24);
@@ -1845,15 +2172,33 @@
         }
 
         Body.setVelocity(p.body, {
-          x: rx * outSpeed + tx * tangential + dirX * 1.7,
-          y: ry * outSpeed + ty * tangential + dirY * 1.7
+          x: rx * outSpeed
+            + tx * tangential
+            + cnx * contactBurst * .55
+            + dirX * 1.7 * forwardShare
+            + jitterX,
+          y: ry * outSpeed
+            + ty * tangential
+            + cny * contactBurst * .55
+            + dirY * 1.7 * forwardShare
+            + jitterY
         });
         Body.setAngularVelocity(p.body, (rng() - .5) * .52 + tangentSign * .08);
       } else {
         const current = p.body.velocity;
         Body.setVelocity(p.body, {
-          x: current.x * .18 + dirX * forward + rx * radial + tx * tangent,
-          y: current.y * .18 + dirY * forward + ry * radial + ty * tangent
+          x: current.x * .12
+            + dirX * forward
+            + rx * radial * .38
+            + cnx * contactBurst
+            + tx * tangent
+            + jitterX,
+          y: current.y * .12
+            + dirY * forward
+            + ry * radial * .38
+            + cny * contactBurst
+            + ty * tangent
+            + jitterY
         });
         Body.setAngularVelocity(p.body, (rng() - .5) * .38 + tangentSign * .05);
       }
@@ -1905,9 +2250,21 @@
         const tangent = (rng() - .5) * 2.1;
         const speed = (V.tuning.khanScatterSpeed || 5.1) * (.78 + rng() * .28);
 
+        let kcx = khan.body.position.x - contact.x;
+        let kcy = khan.body.position.y - contact.y;
+        let kcLen = Math.hypot(kcx, kcy) || 1;
+        kcx /= kcLen;
+        kcy /= kcLen;
+
         Body.setVelocity(khan.body, {
-          x: rx * speed + tx * tangent + dirX,
-          y: ry * speed + ty * tangent + dirY
+          x: rx * speed * .45
+            + kcx * radialFromContact * .72
+            + tx * tangent
+            + dirX * forwardShare,
+          y: ry * speed * .45
+            + kcy * radialFromContact * .72
+            + ty * tangent
+            + dirY * forwardShare
         });
         Body.setAngularVelocity(
           khan.body,
@@ -2028,7 +2385,64 @@
   function updateRound(now) {
     if (!round?.active) return;
 
-    if (!round.impact && now - round.startedAt > 640) triggerScenarioImpact(now);
+    if (!round.impact) {
+      const landing = clampLandingPointInsideCircle(
+        round?.landingPoint || {x:V.field.x,y:V.field.y}
+      );
+      round.landingPoint = landing;
+
+      const arrivalRadius = Math.max(
+        12,
+        Number(V.tuning.landingArrivalRadius ?? 34)
+      );
+      const fallbackMs = Math.max(
+        350,
+        Number(V.tuning.landingFallbackMs ?? 720)
+      );
+
+      let reached = false;
+
+      if (saka?.body) {
+        const px = saka.body.position.x;
+        const py = saka.body.position.y;
+
+        const dist = Math.hypot(
+          landing.x-px,
+          landing.y-py
+        );
+
+        reached = dist <= arrivalRadius;
+
+        if (
+          !reached &&
+          round.flightStart &&
+          round.flightDirection &&
+          Number.isFinite(round.flightDistance)
+        ) {
+          const travelled =
+            (px-round.flightStart.x)*round.flightDirection.x +
+            (py-round.flightStart.y)*round.flightDirection.y;
+
+          if (travelled >= round.flightDistance-arrivalRadius*.35) {
+            reached = true;
+          }
+        }
+      }
+
+      const fallbackReached =
+        now-round.startedAt >= fallbackMs;
+
+      if (reached || fallbackReached) {
+        if (saka?.body) {
+          Body.setPosition(
+            saka.body,
+            {x:landing.x,y:landing.y}
+          );
+        }
+        triggerScenarioImpact(now);
+      }
+    }
+
     if (round.khanImpulseAt && now >= round.khanImpulseAt) launchKhan();
 
     const expectedRegular = round.plan.regular;
@@ -2079,49 +2493,197 @@
     return {x:(e.clientX-r.left)/r.width*V.designWidth, y:(e.clientY-r.top)/r.height*V.designHeight};
   }
 
-  function bindPointer() {
-    app.canvas.addEventListener('pointerdown', e => {
+      function bindPointer() {
+    function clampPullToCircle(rawX,rawY) {
+      const pullX = rawX-V.sakaStart.x;
+      const pullY = rawY-V.sakaStart.y;
+      const pullLen = Math.hypot(pullX,pullY);
+
+      if (pullLen < 1e-6) {
+        return {
+          x:V.sakaStart.x,
+          y:V.sakaStart.y,
+          guide:{x:0,y:-1},
+          power:0
+        };
+      }
+
+      const rawThrow = normalizeVec(-pullX,-pullY);
+      const guide = V.tuning.aimRestrictToField === false
+        ? rawThrow
+        : clampThrowDirectionToCircle(rawThrow);
+
+      const capped = Math.min(115,pullLen);
+
+      return {
+        x:V.sakaStart.x-guide.x*capped,
+        y:V.sakaStart.y-guide.y*capped,
+        guide,
+        power:Math.max(0,Math.min(1,capped/115))
+      };
+    }
+
+    app.canvas.addEventListener('pointerdown',e => {
       if (state !== 'ready' || !saka) return;
+
       const p = pointerToDesign(e);
-      const d = Math.hypot(p.x-saka.body.position.x,p.y-saka.body.position.y);
+      const d = Math.hypot(
+        p.x-saka.body.position.x,
+        p.y-saka.body.position.y
+      );
       if (d > 125) return;
+
       app.canvas.setPointerCapture?.(e.pointerId);
-      drag={active:true,id:e.pointerId,p};
+
+      drag = {
+        active:true,
+        id:e.pointerId,
+        p:{x:V.sakaStart.x,y:V.sakaStart.y},
+        guide:{x:0,y:-1},
+        power:0
+      };
+
       Body.setVelocity(saka.body,{x:0,y:0});
     });
 
-    app.canvas.addEventListener('pointermove', e => {
+    app.canvas.addEventListener('pointermove',e => {
       if (!drag?.active || drag.id !== e.pointerId || state !== 'ready') return;
-      const p=pointerToDesign(e); drag.p=p;
-      const dx=p.x-V.sakaStart.x, dy=p.y-V.sakaStart.y;
-      const len=Math.hypot(dx,dy)||1, max=115, k=Math.min(1,max/len);
-      const x=V.sakaStart.x+dx*k, y=V.sakaStart.y+Math.max(-20,dy*k);
-      Body.setPosition(saka.body,{x,y});
-      Body.setAngle(saka.body, dx*0.003);
+
+      const raw = pointerToDesign(e);
+      const c = clampPullToCircle(raw.x,raw.y);
+
+      drag.p = {x:c.x,y:c.y};
+      drag.guide = c.guide;
+      drag.power = c.power;
+
+      Body.setPosition(saka.body,{x:c.x,y:c.y});
+      Body.setAngle(
+        saka.body,
+        (c.x-V.sakaStart.x)*.003
+      );
     });
 
     const release = e => {
       if (!drag?.active || drag.id !== e.pointerId) return;
-      const p=drag.p; drag=null;
-      const dx=p.x-V.sakaStart.x, dy=Math.max(0,p.y-V.sakaStart.y);
-      const power=Math.max(.72,Math.min(1.25,.78+Math.hypot(dx,dy)/165));
-      startThrow({vx:-dx*.055,vy:-17.4*power});
+
+      const saved = drag;
+      drag = null;
+
+      if (saved.power < .06) {
+        // v20.50: short tap on SAKA is a valid throw.
+        // startThrow() without args selects a deterministic legal direction
+        // inside the circle sector and a normal power.
+        Body.setPosition(saka.body,V.sakaStart);
+        Body.setVelocity(saka.body,{x:0,y:0});
+        startThrow();
+        return;
+      }
+
+      startThrow({
+        guideDir:saved.guide,
+        power:saved.power
+      });
     };
+
     app.canvas.addEventListener('pointerup',release);
     app.canvas.addEventListener('pointercancel',release);
   }
 
-  function startThrow(velocity={vx:0,vy:-17.2}) {
+    function startThrow(options={}) {
     if (state !== 'ready' || !ticket || !saka) return;
+
     if (aimGuide && !aimGuide.destroyed) aimGuide.clear();
+
     hideResult();
     state='throwing';
     round.active=true;
     round.startedAt=performance.now();
     round.impact=false;
     round.settleAt=0;
-    Body.setVelocity(saka.body,{x:velocity.vx,y:velocity.vy});
-    Body.setAngularVelocity(saka.body, velocity.vx*.018 + .16);
+
+    let guideDir;
+    let power;
+
+    if (options?.guideDir) {
+      guideDir = clampThrowDirectionToCircle(options.guideDir);
+      power = Math.max(0,Math.min(1,Number(options.power ?? .65)));
+    } else {
+      const geo = fieldAimGeometry();
+      const rng = seeded(
+        `${round?.seed || ticket?.ticketId || 'ROUND'}|auto-guide`
+      );
+      const a = (rng()*2-1)*geo.halfAngle*.78;
+      guideDir = rotateVec(geo.toCenter,a);
+      power = .48 + rng()*.45;
+    }
+
+    round.guideDirection = guideDir;
+    round.pullPower = power;
+
+    const actual = actualThrowFromGuide(
+      guideDir,
+      power
+    );
+
+    const safeLanding = clampLandingPointInsideCircle(actual.point);
+
+    round.landingPoint = safeLanding;
+    round.actualThrowDirection = actual.dir;
+    round.throwDeviation = actual.deviation;
+
+    if (V.tuning.sakaAirborneNoCollision !== false) {
+      saka.body.collisionFilter.mask = 0;
+    }
+
+    const sx = saka.body.position.x;
+    const sy = saka.body.position.y;
+
+    const flight = normalizeVec(
+      safeLanding.x-sx,
+      safeLanding.y-sy,
+      actual.dir.x,
+      actual.dir.y
+    );
+
+    const speedMin = Math.max(
+      8,
+      Number(V.tuning.sakaFlightSpeedMin ?? 17)
+    );
+    const speedMax = Math.max(
+      speedMin,
+      Number(V.tuning.sakaFlightSpeedMax ?? 20.5)
+    );
+    const speed = speedMin + (speedMax-speedMin)*power;
+
+    round.flightDirection = flight;
+    round.flightStart = {x:sx,y:sy};
+    round.flightDistance = Math.hypot(
+      safeLanding.x-sx,
+      safeLanding.y-sy
+    );
+
+    Body.setVelocity(
+      saka.body,
+      {x:flight.x*speed,y:flight.y*speed}
+    );
+
+    const spinRng = seeded(`${round.seed}|saka-flight-spin`);
+    const spinMin = Math.max(
+      0,
+      Number(V.tuning.sakaFlightSpinMin ?? .34)
+    );
+    const spinMax = Math.max(
+      spinMin,
+      Number(V.tuning.sakaFlightSpinMax ?? .52)
+    );
+    const spinSign = spinRng()>.5 ? 1 : -1;
+    const spin = spinMin + spinRng()*(spinMax-spinMin);
+
+    Body.setAngularVelocity(
+      saka.body,
+      spinSign*spin
+    );
+
     renderState();
   }
 
@@ -2382,7 +2944,7 @@
       await refreshBalance();
       resetBoard('IDLE');
       window.X2ChukoV20 = {
-        version:'20.39',
+        version:'20.52',
         renderer:'PixiJS',
         physics:'Matter.js',
         getState:()=>({state,gameMode,language,currency,currencyDisplay,stake,balance,ticket,scenario:ticket?.scenario,knocked:round?.knocked,khanOut:round?.khanOut}),
@@ -2390,8 +2952,8 @@
         reloadBalance:refreshBalance
       };
     } catch(err) {
-      console.error('[CHUKO v20.39 boot]',err);
-      state='error'; showStatus('v20.39 boot error: '+(err.message||err)); renderState();
+      console.error('[CHUKO v20.52 boot]',err);
+      state='error'; showStatus('v20.52 boot error: '+(err.message||err)); renderState();
     }
   }
 
